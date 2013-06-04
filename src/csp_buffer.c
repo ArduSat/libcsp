@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/arch/csp_semaphore.h>
 
 static csp_queue_handle_t csp_buffers;
+static int* csp_buffer_counts;
 static void *csp_buffer_list;
 static unsigned int count, size;
 
@@ -47,6 +48,10 @@ int csp_buffer_init(int buf_count, int buf_size) {
 	if (csp_buffer_list == NULL)
 		goto fail_malloc;
 
+	csp_buffer_counts = csp_malloc(count * sizeof(int));
+	if (csp_buffer_counts == NULL)
+		goto fail_counts;
+
 	csp_buffers = csp_queue_create(count, sizeof(void *));
 	if (!csp_buffers)
 		goto fail_queue;
@@ -58,6 +63,7 @@ int csp_buffer_init(int buf_count, int buf_size) {
 
 	for (i = 0; i < count; i++) {
 		element = csp_buffer_list + i * size;
+		csp_buffer_counts[i] = 0;
 		csp_queue_enqueue(csp_buffers, &element, 0);
 	}
 
@@ -66,13 +72,28 @@ int csp_buffer_init(int buf_count, int buf_size) {
 fail_critical:
 	csp_queue_remove(csp_buffers);
 fail_queue:
+	csp_free(csp_buffer_counts);
+fail_counts:
 	csp_free(csp_buffer_list);
 fail_malloc:
 	return CSP_ERR_NOMEM;
 
 }
 
+static int csp_buffer_index(void *packet) {
+	if (!packet)
+		return -1;
+
+	for (int i = 0; i < count; i++) {
+		if (csp_buffer_list + i * size == packet) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 void *csp_buffer_get_isr(size_t buf_size) {
+	int index = -1;
 	void *buffer = NULL;
 	CSP_BASE_TYPE task_woken = 0;
 
@@ -80,12 +101,18 @@ void *csp_buffer_get_isr(size_t buf_size) {
 		return NULL;
 
 	csp_queue_dequeue_isr(csp_buffers, &buffer, &task_woken);
+	index = csp_buffer_index(buffer);
+	if (index >= 0 && index < (int) count) {
+		csp_buffer_counts[index]++;
+		return buffer;
+	}
 
-	return buffer;
+	return NULL;
 }
 
 void *csp_buffer_get(size_t buf_size) {
 	void *buffer = NULL;
+	int index = -1;
 
 	if (buf_size + CSP_BUFFER_PACKET_OVERHEAD > size) {
 		csp_log_error("Attempt to allocate too large block %u\r\n", buf_size);
@@ -93,6 +120,11 @@ void *csp_buffer_get(size_t buf_size) {
 	}
 
 	csp_queue_dequeue(csp_buffers, &buffer, 0);
+	index = csp_buffer_index(buffer);
+
+	if (index >= 0 && index < (int) count) {
+		csp_buffer_counts[index]++;
+	}
 
 	if (buffer != NULL) {
 		csp_log_buffer("BUFFER: Using element at %p\r\n", buffer);
@@ -103,11 +135,21 @@ void *csp_buffer_get(size_t buf_size) {
 	return buffer;
 }
 
+
 void csp_buffer_free_isr(void *packet) {
 	CSP_BASE_TYPE task_woken = 0;
 	if (!packet)
 		return;
-	csp_queue_enqueue_isr(csp_buffers, &packet, &task_woken);
+
+	int index = csp_buffer_index(packet);
+	if (index < 0 || index >= (int) count) {
+		return;
+	}
+
+	csp_buffer_counts[index]--;
+	if (csp_buffer_counts[index] == 0) {
+		csp_queue_enqueue_isr(csp_buffers, &packet, &task_woken);
+	}
 }
 
 void csp_buffer_free(void *packet) {
@@ -115,8 +157,21 @@ void csp_buffer_free(void *packet) {
 		csp_log_error("Attempt to free null pointer\r\n");
 		return;
 	}
-	csp_log_buffer("BUFFER: Free element at %p\r\n", packet);
-	csp_queue_enqueue(csp_buffers, &packet, 0);
+
+	int index = csp_buffer_index(packet);
+	if (index < 0 || index >= (int) count) {
+		csp_log_error("Couldn't find buffer: %p\r\n", packet);
+		return;
+	}
+
+	csp_buffer_counts[index]--;
+	if (csp_buffer_counts[index] == 0) {
+		csp_log_buffer("BUFFER: Free element at %p\r\n", packet);
+		csp_queue_enqueue(csp_buffers, &packet, 0);
+	} else {
+		csp_log_warn("BUFFER: Ignoring double-freed buffer %p\r\n", packet);
+		csp_buffer_counts[index] = 0;
+	}
 }
 
 void *csp_buffer_clone(void *buffer) {
