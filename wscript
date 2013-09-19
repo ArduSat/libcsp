@@ -39,6 +39,7 @@ def options(ctx):
 	gr.add_option('--install-csp', action='store_true', help='Installs CSP headers and lib')
 
 	gr.add_option('--disable-output', action='store_true', help='Disable CSP output')
+	gr.add_option('--disable-debug', action='store_true', help='Disable CSP debug')
 	gr.add_option('--disable-verbose', action='store_true', help='Disable filename and lineno on debug');
 	gr.add_option('--enable-rdp', action='store_true', help='Enable RDP support')
 	gr.add_option('--enable-qos', action='store_true', help='Enable Quality of Service support')
@@ -153,7 +154,7 @@ def configure(ctx):
 	ctx.env.ENABLE_EXAMPLES = ctx.options.enable_examples
 
 	# Create config file
-	if not ctx.options.disable_output:
+	if not ctx.options.disable_debug:
 		ctx.env.append_unique('FILES_CSP', 'src/csp_debug.c')
 	else:
 		ctx.env.append_unique('EXCL_CSP', 'src/csp_debug.c')
@@ -174,7 +175,8 @@ def configure(ctx):
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_xtea.c')
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_sha1.c')
 
-	ctx.define_cond('CSP_DEBUG', not ctx.options.disable_output)
+	ctx.define_cond('CSP_DEBUG', not ctx.options.disable_debug)
+	ctx.define_cond('CSP_DISABLE_OUTPUT', ctx.options.disable_output)
 	ctx.define_cond('CSP_VERBOSE', not ctx.options.disable_verbose);
 	ctx.define_cond('CSP_USE_RDP', ctx.options.enable_rdp)
 	ctx.define_cond('CSP_USE_CRC32', ctx.options.enable_crc32)
