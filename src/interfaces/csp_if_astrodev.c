@@ -68,7 +68,12 @@ void csp_astrodev_rx (uint8_t *buf, int len) {
 
     /* Strip off the AX.25 header. */
     buf += sizeof(ax25_header_t);
+
+    /* Remove the header size */
     len -= sizeof(ax25_header_t);
+
+    /* Remove trailing two bytes */
+    len -= (sizeof(uint8_t) * 2);
 
     packet = csp_buffer_get(csp_if_astrodev.mtu);
 
