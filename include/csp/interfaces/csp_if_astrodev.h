@@ -22,7 +22,7 @@ extern csp_iface_t csp_if_astrodev;
 
 typedef int (*csp_astrodev_putstr_f)(uint8_t *buf, int len);
 
-void csp_astrodev_rx (uint8_t *buf, int len);
+void csp_astrodev_rx (uint8_t *buf, int len, void *xTaskWoken);
 int csp_astrodev_init (csp_astrodev_putstr_f astrodev_putstr_f);
 
 #ifdef __cplusplus

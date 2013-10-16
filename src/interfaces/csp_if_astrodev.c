@@ -56,7 +56,7 @@ static int csp_astrodev_tx (csp_packet_t * packet, uint32_t timeout) {
     return ret;
 }
 
-void csp_astrodev_rx (uint8_t *buf, int len) {
+void csp_astrodev_rx (uint8_t *buf, int len, void *xTaskWoken) {
     csp_packet_t *packet;
     ax25_header_t radio_header;
 
@@ -93,8 +93,7 @@ void csp_astrodev_rx (uint8_t *buf, int len) {
             /* Convert the packet from network to host order */
             packet->id.ext = csp_ntoh32(packet->id.ext);
 
-            /* Send back into CSP, notice calling from task so last argument must be NULL! */
-            csp_new_packet(packet, &csp_if_astrodev, NULL);
+            csp_new_packet(packet, &csp_if_astrodev, xTaskWoken);
         }
         else {
             csp_log_warn("Weird radio frame received! Size %u\r\n", packet->length);
