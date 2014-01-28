@@ -117,8 +117,8 @@ int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 	uint8_t mbox;
 
 	if (curr_idx != INVALID_INDEX) {
-		csp_log_warn("Only one device can be activated at a time (device %s is \
-already activated).\r\n",can_ifcs[curr_idx]);
+		csp_log_warn("Only one device can be activated at a time (device %s is already activated).\r\n",
+								 can_ifcs[curr_idx]);
 		return -1;
 	}
 
@@ -150,8 +150,8 @@ already activated).\r\n",can_ifcs[curr_idx]);
 
 	// initialize the sam3x drivers
 	if (can_init_hw(p_cans[curr_idx],conf->clock_speed,baudrate_kbps) == 0) {
-		csp_log_warn("Failed to initialize %s! clock_speed = %d, \
-baudrate_kbps = %d\r\n",can_ifcs[curr_idx],conf->clock_speed,baudrate_kbps);
+		csp_log_warn("Failed to initialize %s! clock_speed = %d, baudrate_kbps = %d\r\n",
+								 can_ifcs[curr_idx],conf->clock_speed,baudrate_kbps);
 		return -1;
 	}
 
@@ -239,24 +239,24 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 
 	// copy data
 	switch (dlc) {
-	case 8:
-		*(((uint8_t *) &(temp[0])) + 3) = data[7];
-	case 7:
-		*(((uint8_t *) &(temp[0])) + 2) = data[6];
-	case 6:
-		*(((uint8_t *) &(temp[0])) + 1) = data[5];
-	case 5:
-		*(((uint8_t *) &(temp[0])) + 0) = data[4];
-	case 4:
-		*(((uint8_t *) &(temp[1])) + 3) = data[3];
-	case 3:
-		*(((uint8_t *) &(temp[1])) + 2) = data[2];
-	case 2:
-		*(((uint8_t *) &(temp[1])) + 1) = data[1];
-	case 1:
-		*(((uint8_t *) &(temp[1])) + 0) = data[0];
-	default:
-		break;
+		case 8:
+			*(((uint8_t *) &(temp[0])) + 3) = data[7];
+		case 7:
+			*(((uint8_t *) &(temp[0])) + 2) = data[6];
+		case 6:
+			*(((uint8_t *) &(temp[0])) + 1) = data[5];
+		case 5:
+			*(((uint8_t *) &(temp[0])) + 0) = data[4];
+		case 4:
+			*(((uint8_t *) &(temp[1])) + 3) = data[3];
+		case 3:
+			*(((uint8_t *) &(temp[1])) + 2) = data[2];
+		case 2:
+			*(((uint8_t *) &(temp[1])) + 1) = data[1];
+		case 1:
+			*(((uint8_t *) &(temp[1])) + 0) = data[0];
+		default:
+			break;
 	}
 
 	mbox_configs[curr_idx][m].ul_datah = temp[0];
@@ -266,8 +266,8 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 	while (can_mailbox_write(p_cans[curr_idx],&mbox_configs[curr_idx][m]) !=
 				 CAN_MAILBOX_TRANSFER_OK) {
 		if (++wc == WRITE_TRIES) {
-			csp_log_warn("can_mailbox_write call returned unsuccessfully after %d \
-attempts.\r\n",WRITE_TRIES);
+			csp_log_warn("can_mailbox_write call returned unsuccessfully after %d attempts.\r\n",
+									 WRITE_TRIES);
 			return -1;
 		}
 	}
@@ -331,8 +331,7 @@ void can_isr (uint8_t dev) {
 						{
 
 							if (++rc == READ_TRIES) {
-								printf("can_mailbox_read call returned unsuccessfully after \
-%d attempts.\r\n",
+								printf("can_mailbox_read call returned unsuccessfully after %d attempts.\r\n",
 											 READ_TRIES);
 								return;
 							}
@@ -369,7 +368,6 @@ void can_isr (uint8_t dev) {
 					//we want, so we have to grab it manually.
 					frame.id = p_cans[curr_idx]->CAN_MB[m].CAN_MID;
 
-					//addMbox(m,frame.dlc,frame.id); // temp wongbr
 					// Call RX Callback
 					if (rxcbs[curr_idx] != NULL)
 						(rxcbs[curr_idx])(&frame, &task_woken);
@@ -385,8 +383,9 @@ void can_isr (uint8_t dev) {
 					can_id_t id = mbox_configs[curr_idx][m].ul_id;
 
 					// Call TX Callback with no error
-					if (txcbs[curr_idx] != NULL)
+					if (txcbs[curr_idx] != NULL) {
 						(txcbs[curr_idx])(id, CAN_NO_ERROR, &task_woken);
+					}
 
 					// Release mailbox
 					mbox_tx_statuses[curr_idx][m] = MBOX_TX_FREE;
