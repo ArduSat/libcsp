@@ -38,7 +38,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/arch/csp_malloc.h>
 #include <csp/arch/csp_time.h>
 #include "../csp_port.h"
-#include <csp/csp_conn.h>
+#include "../csp_conn.h"
 #include "../csp_io.h"
 #include "csp_transport.h"
 
