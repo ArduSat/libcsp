@@ -18,12 +18,16 @@ extern "C" {
 #include <csp/csp.h>
 #include <csp/csp_interface.h>
 
-extern csp_iface_t csp_if_astrodev;
-
 typedef int (*csp_astrodev_putstr_f)(uint8_t *buf, int len);
 
-void csp_astrodev_rx (uint8_t *buf, int len, void *xTaskWoken);
-int csp_astrodev_init (csp_astrodev_putstr_f astrodev_putstr_f);
+typedef struct csp_astrodev_handle_s {
+    csp_astrodev_putstr_f radio_tx;
+} csp_astrodev_handle_t;
+
+void csp_astrodev_rx (csp_iface_t *interface,
+                      uint8_t *buf, int len, void *xTaskWoken);
+void csp_astrodev_init (csp_iface_t *csp_iface, csp_astrodev_handle_t *csp_astrodev_handle,
+                        csp_astrodev_putstr_f astrodev_putstr, const char *name);
 
 #ifdef __cplusplus
 } /* extern "C" */

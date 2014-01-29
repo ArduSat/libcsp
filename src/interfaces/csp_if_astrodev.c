@@ -18,6 +18,8 @@
 #include <csp/interfaces/csp_if_astrodev.h>
 #include <csp/arch/csp_malloc.h>
 
+#define ASTRODEV_PACKET_SIZE 255
+
 typedef struct __attribute__((__packed__)) {
     uint8_t dst_callsign[6];
     uint8_t dst_ssid;
@@ -29,12 +31,12 @@ typedef struct __attribute__((__packed__)) {
     uint8_t pid;
 } ax25_header_t;
 
-static csp_astrodev_putstr_f radio_tx = NULL;
-
-static int csp_astrodev_tx (csp_packet_t * packet, uint32_t timeout) {
+static int csp_astrodev_tx (csp_iface_t *interface,
+                            csp_packet_t *packet, uint32_t timeout) {
     int ret = CSP_ERR_NONE;
     int txbufin = packet->length + CSP_HEADER_LENGTH;
     uint8_t *txbuf = csp_malloc(txbufin);
+    csp_astrodev_handle_t *driver = interface->driver;
 
     if (txbuf == NULL)
         return CSP_ERR_NOMEM;
@@ -45,8 +47,8 @@ static int csp_astrodev_tx (csp_packet_t * packet, uint32_t timeout) {
     memcpy(txbuf, &packet->id.ext, txbufin);
 
     /* The packet goes straigth to the radio. */
-    if (radio_tx(txbuf, txbufin) != 0) {
-        csp_if_astrodev.tx_error++;
+    if (driver->radio_tx(txbuf, txbufin) != 0) {
+        interface->tx_error++;
         ret = CSP_ERR_TIMEDOUT;
     }
     else {
@@ -58,7 +60,8 @@ static int csp_astrodev_tx (csp_packet_t * packet, uint32_t timeout) {
     return ret;
 }
 
-void csp_astrodev_rx (uint8_t *buf, int len, void *xTaskWoken) {
+void csp_astrodev_rx (csp_iface_t *interface,
+                      uint8_t *buf, int len, void *xTaskWoken) {
     csp_packet_t *packet;
     ax25_header_t radio_header;
 
@@ -77,7 +80,7 @@ void csp_astrodev_rx (uint8_t *buf, int len, void *xTaskWoken) {
     /* Remove trailing two bytes */
     len -= (sizeof(uint8_t) * 2);
 
-    packet = csp_buffer_get(csp_if_astrodev.mtu);
+    packet = csp_buffer_get(interface->mtu);
 
     if (packet != NULL) {
         memcpy(&packet->id.ext, buf, len);
@@ -85,7 +88,7 @@ void csp_astrodev_rx (uint8_t *buf, int len, void *xTaskWoken) {
         packet->length = len;
 
         if (packet->length >= CSP_HEADER_LENGTH &&
-            packet->length <= csp_if_astrodev.mtu + CSP_HEADER_LENGTH) {
+            packet->length <= interface->mtu + CSP_HEADER_LENGTH) {
 
             /* Strip the CSP header off the length field before converting to CSP packet */
             packet->length -= CSP_HEADER_LENGTH;
@@ -93,31 +96,29 @@ void csp_astrodev_rx (uint8_t *buf, int len, void *xTaskWoken) {
             /* Convert the packet from network to host order */
             packet->id.ext = csp_ntoh32(packet->id.ext);
 
-            csp_new_packet(packet, &csp_if_astrodev, xTaskWoken);
+            csp_new_packet(packet, interface, xTaskWoken);
         }
         else {
             csp_log_warn("Weird radio frame received! Size %u\r\n", packet->length);
-            csp_if_astrodev.frame++;
+            interface->frame++;
             csp_buffer_free(packet);
         }
     }
     else {
-        csp_if_astrodev.frame++;
+        interface->frame++;
     }
 }
 
-int csp_astrodev_init (csp_astrodev_putstr_f astrodev_putstr_f) {
-    radio_tx = astrodev_putstr_f;
+void csp_astrodev_init (csp_iface_t *csp_iface, csp_astrodev_handle_t *csp_astrodev_handle,
+                       csp_astrodev_putstr_f astrodev_putstr, const char *name) {
+
+    csp_astrodev_handle->radio_tx = astrodev_putstr;
+
+    csp_iface->driver = csp_astrodev_handle;
+    csp_iface->mtu = ASTRODEV_PACKET_SIZE - CSP_HEADER_LENGTH;
+    csp_iface->nexthop = csp_astrodev_tx;
+    csp_iface->name = name;
 
     /* Register interface */
-    csp_route_add_if(&csp_if_astrodev);
-
-    return CSP_ERR_NONE;
+    csp_route_add_if(csp_iface);
 }
-
-/** Interface definition */
-csp_iface_t csp_if_astrodev = {
-    .name = "ASTRODEV",
-    .nexthop = csp_astrodev_tx,
-    .mtu = 255 - CSP_HEADER_LENGTH,
-};
