@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/csp.h>
 #include <csp/csp_error.h>
 #include <csp/csp_endian.h>
+#include <csp/csp_crc32.h>
 #include <csp/interfaces/csp_if_lo.h>
 
 #include <csp/arch/csp_thread.h>
@@ -37,7 +38,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "crypto/csp_hmac.h"
 #include "crypto/csp_xtea.h"
-#include "csp_crc32.h"
 
 #include "csp_io.h"
 #include "csp_port.h"
@@ -90,11 +90,6 @@ int csp_init(unsigned char address) {
 	ret = csp_route_table_init();
 	if (ret != CSP_ERR_NONE)
 		return ret;
-
-	/* Generate CRC32 table */
-#ifdef CSP_USE_CRC32
-	csp_crc32_gentab();
-#endif
 
 	return CSP_ERR_NONE;
 
@@ -298,7 +293,7 @@ int csp_send_direct(csp_id_t idout, csp_packet_t * packet, uint32_t timeout) {
 		goto tx_err;
 	}
 
-	if ((*ifout->interface->nexthop)(packet, timeout) != CSP_ERR_NONE)
+	if ((*ifout->interface->nexthop)(ifout->interface, packet, timeout) != CSP_ERR_NONE)
 		goto tx_err;
 
 	ifout->interface->tx++;
@@ -384,7 +379,7 @@ int csp_transaction_persistent(csp_conn_t * conn, uint32_t timeout, void * outbu
 
 int csp_transaction(uint8_t prio, uint8_t dest, uint8_t port, uint32_t timeout, void * outbuf, int outlen, void * inbuf, int inlen) {
 
-	csp_conn_t * conn = csp_connect(prio, dest, port, 0, 0);
+	csp_conn_t * conn = csp_connect(prio, dest, port, 0, CSP_O_NONE);
 	if (conn == NULL)
 		return 0;
 

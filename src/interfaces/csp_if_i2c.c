@@ -30,7 +30,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 static int csp_i2c_handle = 0;
 
-int csp_i2c_tx(csp_packet_t * packet, uint32_t timeout) {
+int csp_i2c_tx(csp_iface_t * interface, csp_packet_t * packet, uint32_t timeout) {
 
 	/* Cast the CSP packet buffer into an i2c frame */
 	i2c_frame_t * frame = (i2c_frame_t *) packet;
@@ -99,7 +99,7 @@ int csp_i2c_init(uint8_t addr, int handle, int speed) {
 
 	/* Create i2c_handle */
 	csp_i2c_handle = handle;
-	if (i2c_init(csp_i2c_handle, I2C_MASTER, addr, speed, 10, 0, csp_i2c_rx) != E_NO_ERR)
+	if (i2c_init(csp_i2c_handle, I2C_MASTER, addr, speed, 10, 10, csp_i2c_rx) != E_NO_ERR)
 		return CSP_ERR_DRIVER;
 
 	/* Regsiter interface */
