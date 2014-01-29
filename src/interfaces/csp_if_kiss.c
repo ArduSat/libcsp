@@ -34,7 +34,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * Some day, stop using CRC on layer 2 and move to layer 3
  * Keeping now for backwards compatability with csp 1.0 devices
  **/
-#define KISS_CRC32 0
+#define KISS_CRC32 1
 
 #define KISS_MODE_NOT_STARTED 0
 #define KISS_MODE_STARTED 1

@@ -53,7 +53,6 @@ def options(ctx):
 	# Interfaces
 	gr.add_option('--enable-if-i2c', action='store_true', help='Enable I2C interface')
 	gr.add_option('--enable-if-kiss', action='store_true', help='Enable KISS/RS.232 interface')
-	gr.add_option('--enable-if-multikiss', action='store_true', help='Enable multiple KISS/RS.232 interfaces')
 	gr.add_option('--enable-if-astrodev', action='store_true', help='Enable Astrodev Radio interface')
 	gr.add_option('--enable-if-can', action='store_true', help='Enable CAN interface')
 
@@ -150,8 +149,6 @@ def configure(ctx):
 		ctx.env.append_unique('FILES_CSP', 'src/interfaces/csp_if_i2c.c')
 	if ctx.options.enable_if_kiss:
 		ctx.env.append_unique('FILES_CSP', 'src/interfaces/csp_if_kiss.c')
-	if ctx.options.enable_if_multikiss:
-		ctx.env.append_unique('FILES_CSP', 'src/interfaces/csp_if_multikiss.c')
 
 	if ctx.options.enable_if_astrodev:
 		ctx.env.append_unique('FILES_CSP', 'src/interfaces/csp_if_astrodev.c')
