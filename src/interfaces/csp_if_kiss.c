@@ -50,8 +50,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define TNC_SET_HARDWARE	0x06
 #define TNC_RETURN			0xFF
 
-volatile short csp_interface_kiss_transmitting = 0;
-
 static csp_kiss_putstr_f kiss_putstr;
 static csp_kiss_discard_f kiss_discard;
 
@@ -154,12 +152,7 @@ int csp_kiss_tx(csp_packet_t * packet, uint32_t timeout) {
 	}
 	txbuf[txbufin++] = FEND;
 	csp_buffer_free(packet);
-
-	/* Beautiful.. </sarcasm> --fms */
-	csp_interface_kiss_transmitting = 1;
 	kiss_putstr(txbuf, txbufin);
-	csp_interface_kiss_transmitting = 0;
-
 	csp_free(txbuf);
 
 	return CSP_ERR_NONE;
