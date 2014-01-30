@@ -57,7 +57,7 @@ def options(ctx):
 	gr.add_option('--enable-if-can', action='store_true', help='Enable CAN interface')
 
 	# Drivers
-	gr.add_option('--with-driver-can', default=None, metavar='CHIP', help='Build CAN driver. [socketcan, at91sam7a1, at91sam7a3 or at90can128]')
+	gr.add_option('--with-driver-can', default=None, metavar='CHIP', help='Build CAN driver. [socketcan, at91sam7a1, at91sam7a3, at90can128, or at91sam3x8e]')
 	gr.add_option('--with-driver-usart', default=None, metavar='DRIVER', help='Build USART driver. [windows, linux, None]')
 	gr.add_option('--with-drivers', metavar='PATH', default='../libgomspace/include', help='Set path to Driver header files')
 
@@ -80,8 +80,8 @@ def configure(ctx):
 		ctx.fatal('--with-os must be either \'posix\', \'windows\', \'macosx\' or \'freertos\'')
 
 	# Validate CAN drivers
-	if not ctx.options.with_driver_can in (None, 'socketcan', 'at91sam7a1', 'at91sam7a3', 'at90can128'):
-		ctx.fatal('--with-driver-can must be either \'socketcan\', \'at91sam7a1\', \'at91sam7a3\', \'at90can128\'')
+	if not ctx.options.with_driver_can in (None, 'socketcan', 'at91sam7a1', 'at91sam7a3', 'at90can128','at91sam3x8e'):
+		ctx.fatal('--with-driver-can must be either \'socketcan\', \'at91sam7a1\', \'at91sam7a3\', \'at90can128\',\'at91sam3x8e\'')
 
 	# Validate USART drivers
 	if not ctx.options.with_driver_usart in (None, 'windows', 'linux'):
