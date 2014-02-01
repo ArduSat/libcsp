@@ -53,18 +53,17 @@ def options(ctx):
 	# Interfaces
 	gr.add_option('--enable-if-i2c', action='store_true', help='Enable I2C interface')
 	gr.add_option('--enable-if-kiss', action='store_true', help='Enable KISS/RS.232 interface')
-	gr.add_option('--enable-if-multikiss', action='store_true', help='Enable multiple KISS/RS.232 interfaces')
 	gr.add_option('--enable-if-astrodev', action='store_true', help='Enable Astrodev Radio interface')
 	gr.add_option('--enable-if-can', action='store_true', help='Enable CAN interface')
 
 	# Drivers
 	gr.add_option('--with-driver-can', default=None, metavar='CHIP', help='Build CAN driver. [socketcan, at91sam7a1, at91sam7a3, at90can128, or at91sam3x8e]')
 	gr.add_option('--with-driver-usart', default=None, metavar='DRIVER', help='Build USART driver. [windows, linux, None]')
-	gr.add_option('--with-drivers', metavar='PATH', default='../../libgomspace/include', help='Set path to Driver header files')
+	gr.add_option('--with-drivers', metavar='PATH', default='../libgomspace/include', help='Set path to Driver header files')
 
 	# OS
 	gr.add_option('--with-os', metavar='OS', default='posix', help='Set operating system. Must be either \'posix\', \'macosx\', \'windows\' or \'freertos\'')
-	gr.add_option('--with-freertos', metavar='PATH', default='../../libgomspace/include', help='Set path to FreeRTOS header files')
+	gr.add_option('--with-freertos', metavar='PATH', default='../libgomspace/include', help='Set path to FreeRTOS header files')
 
 	# Options
 	gr.add_option('--with-rdp-max-window', metavar='SIZE', type=int, default=20, help='Set maximum window size for RDP')
@@ -105,7 +104,10 @@ def configure(ctx):
 	ctx.define('GIT_REV', git_rev)
 
 	# Setup CFLAGS
-	ctx.env.prepend_value('CFLAGS', ['-Os','-Wall', '-g', '-std=gnu99'])
+	if (len(ctx.env.CFLAGS) == 0):
+                ctx.env.prepend_value('CFLAGS', ['-Os','-Wall', '-g' ])
+
+        ctx.env.append_unique('CFLAGS', [ '-std=gnu99' ])
 
 	# Setup extra includes
 	ctx.env.append_unique('INCLUDES_CSP', ['include'] + ctx.options.includes.split(','))
@@ -150,8 +152,6 @@ def configure(ctx):
 		ctx.env.append_unique('FILES_CSP', 'src/interfaces/csp_if_i2c.c')
 	if ctx.options.enable_if_kiss:
 		ctx.env.append_unique('FILES_CSP', 'src/interfaces/csp_if_kiss.c')
-	if ctx.options.enable_if_multikiss:
-		ctx.env.append_unique('FILES_CSP', 'src/interfaces/csp_if_multikiss.c')
 
 	if ctx.options.enable_if_astrodev:
 		ctx.env.append_unique('FILES_CSP', 'src/interfaces/csp_if_astrodev.c')
@@ -242,7 +242,7 @@ def build(ctx):
 		target = 'csp',
 		includes= ctx.env.INCLUDES_CSP,
 		export_includes = 'include',
-		use = 'csp_size include',
+		use = 'include freertos_h',
 		install_path = install_path,
 	)
 
@@ -259,9 +259,10 @@ def build(ctx):
 	# Build shared library for Python bindings
 	if ctx.env.ENABLE_BINDINGS:
 		ctx.shlib(source=ctx.path.ant_glob(ctx.env.FILES_CSP),
-			target = 'pycsp',
+			target = 'csp',
 			includes= ctx.env.INCLUDES_CSP,
 			export_includes = 'include',
+			use = 'include',
 			lib=libs)
 
 	if ctx.env.ENABLE_EXAMPLES:

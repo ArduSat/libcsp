@@ -38,7 +38,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/arch/csp_malloc.h>
 #include <csp/arch/csp_time.h>
 #include "../csp_port.h"
-#include <csp/csp_conn.h>
+#include "../csp_conn.h"
 #include "../csp_io.h"
 #include "csp_transport.h"
 
@@ -939,7 +939,7 @@ error:
 int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 
 	if (conn->rdp.state != RDP_OPEN) {
-		csp_log_error("RDP: ERROR cannot send, connection reset by peer!\r\n");
+		csp_log_error("RDP: ERROR cannot send, connection reset\r\n");
 		return CSP_ERR_RESET;
 	}
 
@@ -948,10 +948,15 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	if (in_flight > conn->rdp.window_size) {
 		csp_log_protocol("RDP: Waiting for window update before sending seq %u\r\n", conn->rdp.snd_nxt);
 		csp_bin_sem_wait(&conn->rdp.tx_wait, 0);
-		if ((csp_bin_sem_wait(&conn->rdp.tx_wait, timeout)) != CSP_SEMAPHORE_OK) {
+		if ((csp_bin_sem_wait(&conn->rdp.tx_wait, conn->rdp.conn_timeout)) != CSP_SEMAPHORE_OK) {
 			csp_log_error("Timeout during send\r\n");
 			return CSP_ERR_TIMEDOUT;
 		}
+	}
+
+	if (conn->rdp.state != RDP_OPEN) {
+		csp_log_error("RDP: ERROR cannot send, connection reset\r\n");
+		return CSP_ERR_RESET;
 	}
 
 	/* Add RDP header */

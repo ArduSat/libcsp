@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/csp_endian.h>
 #include <csp/csp_platform.h>
 #include <csp/csp_error.h>
+#include <csp/csp_crc32.h>
 #include <csp/interfaces/csp_if_lo.h>
 
 #include <csp/arch/csp_thread.h>
@@ -40,11 +41,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "crypto/csp_hmac.h"
 #include "crypto/csp_xtea.h"
-#include "csp_crc32.h"
 
 #include "csp_port.h"
 #include "csp_route.h"
-#include "csp/csp_conn.h"
+#include "csp_conn.h"
 #include "csp_io.h"
 #include "transport/csp_transport.h"
 
@@ -117,6 +117,8 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * interf
 	/* CRC32 verified packet */
 	if (packet->id.flags & CSP_FCRC32) {
 #ifdef CSP_USE_CRC32
+		if (packet->length < 4)
+			csp_log_error("Too short packet for CRC32, %u", packet->length);
 		/* Verify CRC32  */
 		if (csp_crc32_verify(packet) != 0) {
 			/* Checksum failed */
@@ -126,7 +128,6 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * interf
 		}
 	} else if (security_opts & CSP_SO_CRC32REQ) {
 		csp_log_warn("Received packet without CRC32. Accepting packet\r\n");
-		packet->length -= sizeof(uint32_t);
 #else
 		/* Strip CRC32 field and accept the packet */
 		csp_log_warn("Received packet with CRC32, but CSP was compiled without CRC32 support. Accepting packet\r\n");
@@ -313,7 +314,7 @@ CSP_DEFINE_TASK(csp_task_router) {
 		/* Search for an existing connection */
 		conn = csp_conn_find(packet->id.ext, CSP_ID_CONN_MASK);
 
-		/* If no connection was found, try to create a new one */
+		/* If this is an incoming packet on a new connection */
 		if (conn == NULL) {
 
 			/* Reject packet if no matching socket is found */
@@ -322,10 +323,17 @@ CSP_DEFINE_TASK(csp_task_router) {
 				continue;
 			}
 
+			/* Run security check on incoming packet */
+			if (csp_route_security_check(socket->opts, input.interface, packet) < 0) {
+				csp_buffer_free(packet);
+				continue;
+			}
+
 			/* New incoming connection accepted */
 			csp_id_t idout;
 			idout.pri   = packet->id.pri;
 			idout.src   = my_address;
+
 			idout.dst   = packet->id.src;
 			idout.dport = packet->id.sport;
 			idout.sport = packet->id.dport;
@@ -344,12 +352,15 @@ CSP_DEFINE_TASK(csp_task_router) {
 			conn->socket = socket->socket;
 			conn->opts = socket->opts;
 
-		}
+		/* Packet to existing connection */
+		} else {
 
-		/* Run security check on incoming packet */
-		if (csp_route_security_check(conn->opts, input.interface, packet) < 0) {
-			csp_buffer_free(packet);
-			continue;
+			/* Run security check on incoming packet */
+			if (csp_route_security_check(conn->opts, input.interface, packet) < 0) {
+				csp_buffer_free(packet);
+				continue;
+			}
+
 		}
 
 		/* Pass packet to the right transport module */

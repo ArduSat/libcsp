@@ -1,7 +1,7 @@
 /*
 Cubesat Space Protocol - A small network-layer protocol designed for Cubesats
 Copyright (C) 2012 GomSpace ApS (http://www.gomspace.com)
-Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk)
+Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk) 
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -33,11 +33,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/arch/csp_malloc.h>
 #include <csp/arch/csp_time.h>
 
-#include "csp/csp_conn.h"
+#include "csp_conn.h"
 #include "transport/csp_transport.h"
 
 /* Static connection pool */
-csp_conn_t arr_conn[CSP_CONN_MAX];
+static csp_conn_t arr_conn[CSP_CONN_MAX];
 
 /* Connection pool lock */
 static csp_bin_sem_handle_t conn_lock;
@@ -97,13 +97,17 @@ int csp_conn_enqueue_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		rxq = CSP_RX_QUEUES - 1;
 	}
 
-	if (csp_queue_enqueue(conn->rx_queue[rxq], &packet, 0) != CSP_QUEUE_OK)
+	if (csp_queue_enqueue(conn->rx_queue[rxq], &packet, 0) != CSP_QUEUE_OK) {
+		csp_log_error("RX queue %p full with %u items\r\n", conn->rx_queue[rxq], csp_queue_size(conn->rx_queue[rxq]));
 		return CSP_ERR_NOMEM;
+	}
 
 #ifdef CSP_USE_QOS
 	int event = 0;
-	if (csp_queue_enqueue(conn->rx_event, &event, 0) != CSP_QUEUE_OK)
+	if (csp_queue_enqueue(conn->rx_event, &event, 0) != CSP_QUEUE_OK) {
+		csp_log_error("QOS event queue full\r\n");
 		return CSP_ERR_NOMEM;
+	}
 #endif
 
 	return CSP_ERR_NONE;
@@ -163,7 +167,7 @@ csp_conn_t * csp_conn_find(uint32_t id, uint32_t mask) {
 		if ((conn->state != CONN_CLOSED) && (conn->type == CONN_CLIENT) && (conn->idin.ext & mask) == (id & mask))
 			return conn;
 	}
-
+	
 	return NULL;
 
 }
@@ -347,7 +351,7 @@ csp_conn_t * csp_connect(uint8_t prio, uint8_t dest, uint8_t dport, uint32_t tim
 		return NULL;
 #endif
 	}
-
+	
 	/* Find an unused ephemeral port */
 	csp_conn_t * conn;
 
@@ -362,7 +366,7 @@ csp_conn_t * csp_connect(uint8_t prio, uint8_t dest, uint8_t dport, uint32_t tim
 
 		outgoing_id.sport = sport;
 		incoming_id.dport = sport;
-
+		
 		/* Match on destination port of _incoming_ identifier */
 		conn = csp_conn_find(incoming_id.ext, CSP_ID_DPORT_MASK);
 

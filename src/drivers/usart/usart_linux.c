@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/epoll.h>
 #include <time.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -32,8 +31,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <fcntl.h>
 
 #include <csp/csp.h>
+#include <sys/time.h>
 
-#define EPOLL_MAX_EVENTS 16
 #define MAX_USARTS 4
 
 typedef struct {
@@ -130,51 +129,30 @@ char usart_getc(int handle) {
 }
 
 int usart_messages_waiting(int handle) {
-	return 0;
+  struct timeval tv;
+  fd_set fds;
+  tv.tv_sec = 0;
+  tv.tv_usec = 0;
+  FD_ZERO(&fds);
+  FD_SET(STDIN_FILENO, &fds);
+  select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
+  return (FD_ISSET(0, &fds));
 }
 
 static void *serial_rx_thread(void *vptr_args) {
-	int efd, n_events, i;
-	struct epoll_event event;
-	struct epoll_event events[EPOLL_MAX_EVENTS];
-	ssize_t count;
-	char buf[512];
-	uint32_t e;
-	usart_linux_t *usart = (usart_linux_t *) vptr_args;
-
-	efd = epoll_create1(0);
-	event.data.fd = usart->fd;
-	event.events = EPOLLIN | EPOLLET;
-	if (epoll_ctl(efd, EPOLL_CTL_ADD, usart->fd, &event) == -1) {
-		printf("Error adding epoll descriptor: %s\r\n", strerror(errno));
-		return NULL;
-	}
+	unsigned int length;
+	uint8_t * cbuf = malloc(100000); // Is this thing ever freed?
+  usart_linux_t *args = (usart_linux_t *)vptr_args;
 
 	// Receive loop
 	while (1) {
-		n_events = epoll_wait(efd, events, EPOLL_MAX_EVENTS, -1);
-		for (i = 0; i < n_events; i++) {
-			e = events[i].events;
-			if ((e & EPOLLERR) || (e & EPOLLHUP) || (!(e & EPOLLIN))) {
-				printf("Epoll file descriptor error\n");
-				close(events[i].data.fd);
-				continue;
-			}
-
-			if (usart->fd != events[i].data.fd) {
-				continue;
-			}
-
-			while (1) {
-				count = read(events[i].data.fd, buf, sizeof(buf));
-				if (count <= 0 || !usart->usart_callback) {
-					break;
-				}
-
-				usart->usart_callback(buf, count, NULL);
-			}
+		length = read(args->fd, cbuf, 300);
+		if (length <= 0) {
+			perror("Error: ");
+			exit(1);
 		}
+		if (args->usart_callback)
+			args->usart_callback(cbuf, length, NULL);
 	}
-
 	return NULL;
 }
