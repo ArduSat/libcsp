@@ -26,6 +26,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/csp.h>
 #include <csp/csp_error.h>
 
+#include <syscalls.h>
+
 #include <csp/arch/csp_system.h>
 
 int csp_sys_tasklist(char * out) {
@@ -34,28 +36,11 @@ int csp_sys_tasklist(char * out) {
 }
 
 uint32_t csp_sys_memfree(void) {
-
-	uint32_t total = 0, max = UINT32_MAX, size;
-	void * pmem;
-
-	/* If size_t is less than 32 bits, start with 10 KiB */
-	size = sizeof(uint32_t) > sizeof(size_t) ? 10000 : 1000000;
-
-	while (1) {
-		pmem = pvPortMalloc(size + total);
-		if (pmem == NULL) {
-			max = size + total;
-			size = size / 2;
-		} else {
-			total += size;
-			if (total + size >= max)
-				size = size / 2;
-			vPortFree(pmem);
-		}
-		if (size < 32) break;
-	}
-
-	return total;
+	// This code used to repeatedly call malloc until it filled
+	// up memory, which was a bad idea for a few reasons.  I've
+	// changed it to just query our allocator for the amount of
+	// space remaining.  [mconst, 2014/2/12]
+	return memfree();
 }
 
 int csp_sys_reboot(void) {
