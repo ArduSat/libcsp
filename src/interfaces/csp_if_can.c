@@ -94,7 +94,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define PBUF_ELEMENTS CSP_CONN_MAX
 
 /** Buffer element timeout in ms */
-#define PBUF_TIMEOUT_MS 10000
+#define PBUF_TIMEOUT_MS 2000
 
 /** CFP Frame Types */
 enum cfp_frame_t {
@@ -693,7 +693,7 @@ int csp_can_init(uint8_t mode, struct csp_can_config *conf) {
 		return CSP_ERR_NOMEM;
 	}
 	
-	ret = csp_thread_create(csp_can_rx_task, (signed char *) "CAN", 1000/sizeof(int), NULL, 3, &can_rx_task);
+	ret = csp_thread_create(csp_can_rx_task, (signed char *) "CAN", 4000/sizeof(int), NULL, 3, &can_rx_task);
 	if (ret != 0) {
 		csp_log_error("Failed to init CAN RX task\r\n");
 		return CSP_ERR_NOMEM;
