@@ -1,7 +1,7 @@
 /*
 Cubesat Space Protocol - A small network-layer protocol designed for Cubesats
 Copyright (C) 2012 Gomspace ApS (http://www.gomspace.com)
-Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk) 
+Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk)
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifdef __AVR__
 #include <avr/pgmspace.h>
+#endif
+
+#ifdef __linux__
+#include <syslog.h>
 #endif
 
 /* CSP includes */
@@ -86,7 +90,7 @@ void do_csp_debug(csp_debug_level_t level, const char * format, ...) {
 	default:
 		return;
 	}
-	
+
 	va_start(args, format);
 
 	/* If csp_debug_hook symbol is defined, pass on the message.
@@ -100,6 +104,9 @@ void do_csp_debug(csp_debug_level_t level, const char * format, ...) {
 #ifdef __AVR__
 		vfprintf_P(stdout, format, args);
 #else
+#ifdef __linux__
+    vsyslog(LOG_INFO, format, args);
+#endif
 		vprintf(format, args);
 #endif
 		csp_sys_set_color(COLOR_RESET);
