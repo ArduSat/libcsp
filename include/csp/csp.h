@@ -453,8 +453,13 @@ int csp_bind(csp_socket_t *socket, uint8_t port);
  */
 int csp_route_set(uint8_t node, csp_iface_t *ifc, uint8_t nexthop_mac_addr);
 
+typedef struct __attribute__((__packed__)) {
+	csp_iface_t * interface;
+	uint8_t nexthop_mac_addr;
+} csp_route_t;
+
 #define CSP_ROUTE_COUNT 			(CSP_ID_HOST_MAX + 2)
-#define CSP_ROUTE_TABLE_SIZE		5 * CSP_ROUTE_COUNT
+#define CSP_ROUTE_TABLE_SIZE		sizeof(csp_route_t) * CSP_ROUTE_COUNT
 
 /**
  * Resets route
