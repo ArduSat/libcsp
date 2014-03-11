@@ -32,10 +32,6 @@ extern "C" {
 #include <csp/arch/csp_thread.h>
 #include <csp/arch/csp_queue.h>
 
-typedef struct __attribute__((__packed__)) {
-	csp_iface_t * interface;
-	uint8_t nexthop_mac_addr;
-} csp_route_t;
 
 /**
  * csp_route_table_init
