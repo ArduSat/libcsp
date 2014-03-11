@@ -49,7 +49,7 @@
 
 #include "can.h" // csp version
 #include "sam3x8e/system/drivers/can/can.h"	 // sam3x8e-skeleton version
-
+#include "csp/drivers/can_at91sam3x8e.h"
 
 // MOB segmentation ; mbox indices < 4 are for tx mboxes;
 #define CAN_TX_MBOXES 4
@@ -93,8 +93,10 @@ typedef enum {
 #define NUM_CAN_DEVICES 2
 mbox_tx_status_t mbox_tx_statuses[NUM_CAN_DEVICES][CAN_TX_MBOXES];
 can_mb_conf_t mbox_configs[NUM_CAN_DEVICES][CAN_MBOXES];
-
-
+uint32_t stored_ids[NUM_CAN_DEVICES];
+uint32_t stored_masks[NUM_CAN_DEVICES];
+struct csp_can_config stored_configs[NUM_CAN_DEVICES];
+uint32_t stored_baudrate_kbps[NUM_CAN_DEVICES];
 // ISR prototype
 static void can_isr (uint8_t dev);
 
@@ -113,8 +115,9 @@ static void can_isr (uint8_t dev);
 int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 							can_rx_callback_t arxcb, struct csp_can_config *conf) {
 
+	printf("init, init\r\n");
+
 	uint32_t baudrate_kbps;
-	uint8_t mbox;
 
 	if (curr_idx != INVALID_INDEX) {
 		csp_log_warn("Only one device can be activated at a time (device %s is already activated).\r\n",
@@ -148,10 +151,40 @@ int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 								 curr_idx);
 	}
 
+	// Store data, so we can reset without needing to pass in data again.
+	stored_ids[curr_idx] = id;
+	stored_masks[curr_idx] = mask;
+	stored_configs[curr_idx] = *conf;
+	stored_baudrate_kbps[curr_idx] = baudrate_kbps;
+	return can_reset(curr_idx);
+}
+
+
+/**
+ * can_reset
+ * this used to be part of can_init, but we allow an entry for resetting the
+ * device without necessarily changing the top level configuration.
+ * @index the index of the device
+ * @return 0 on success, -1 on error, -2 if not enabled.
+ */
+int can_reset (int8_t index) {
+	uint8_t mbox;
+
+	// chck against current index.
+	if (index != curr_idx) {
+		return -2;
+	}
+
+	// set the can to disable, and wait a bit
+	//can_disable(p_cans[curr_idx]);
+	//vTaskDelay(configTICK_RATE_HZ);
+
 	// initialize the sam3x drivers
-	if (can_init_hw(p_cans[curr_idx],conf->clock_speed,baudrate_kbps) == 0) {
+	if (can_init_hw(p_cans[curr_idx],stored_configs[curr_idx].clock_speed,
+					stored_baudrate_kbps[curr_idx]) == 0) {
 		csp_log_warn("Failed to initialize %s! clock_speed = %d, baudrate_kbps = %d\r\n",
-								 can_ifcs[curr_idx],conf->clock_speed,baudrate_kbps);
+					 can_ifcs[curr_idx],stored_configs[curr_idx].clock_speed,
+					 stored_baudrate_kbps[curr_idx]);
 		return -1;
 	}
 
@@ -163,9 +196,9 @@ int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 
 			mbox_configs[curr_idx][mbox].ul_mb_idx = mbox; // mailbox index (4-7)
 			mbox_configs[curr_idx][mbox].uc_obj_type = CAN_MB_RX_MODE;
-			mbox_configs[curr_idx][mbox].ul_id_msk = mask; // rx based on device mask
+			mbox_configs[curr_idx][mbox].ul_id_msk = stored_masks[curr_idx]; // rx based on device mask
 			mbox_configs[curr_idx][mbox].uc_id_ver = 1; // 1 = extended
-			mbox_configs[curr_idx][mbox].ul_id = id; // our ID
+			mbox_configs[curr_idx][mbox].ul_id = stored_ids[curr_idx]; // our ID
 			can_mailbox_init(p_cans[curr_idx],&(mbox_configs[curr_idx][mbox]));
 
 		} else {
@@ -183,6 +216,8 @@ int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 	can_enable_interrupt(p_cans[curr_idx],CAN_RX_IER_MASK);
 	NVIC_EnableIRQ(IRQ_numbers[curr_idx]); // Enable CAN device interrupts
 	can_global_send_transfer_cmd(p_cans[curr_idx],CAN_RX_TCR_MASK);
+
+	printf("done,done\r\n");
 
 	return 0;
 }
