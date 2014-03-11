@@ -9,6 +9,7 @@ waf-*/
 .project
 .cproject
 ~*
+*~
 pdebug*
 *.tar*
 tags
