@@ -114,9 +114,6 @@ static void can_isr (uint8_t dev);
  */
 int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 							can_rx_callback_t arxcb, struct csp_can_config *conf) {
-
-	printf("init, init\r\n");
-
 	uint32_t baudrate_kbps;
 
 	if (curr_idx != INVALID_INDEX) {
@@ -216,8 +213,6 @@ int can_reset (int8_t index) {
 	can_enable_interrupt(p_cans[curr_idx],CAN_RX_IER_MASK);
 	NVIC_EnableIRQ(IRQ_numbers[curr_idx]); // Enable CAN device interrupts
 	can_global_send_transfer_cmd(p_cans[curr_idx],CAN_RX_TCR_MASK);
-
-	printf("done,done\r\n");
 
 	return 0;
 }
