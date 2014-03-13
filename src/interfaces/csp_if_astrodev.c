@@ -67,13 +67,16 @@ void csp_astrodev_rx (csp_iface_t *interface,
     csp_packet_t *packet;
 
     csp_astrodev_handle_t* handle =
-        (csp_astrodev_handle_t*) &(interface->driver);
+        (csp_astrodev_handle_t*) (interface->driver);
     ax25_header_t radio_header;
 
     if (handle->use_ax25_header) {
 
         if (len < (int)sizeof(ax25_header_t) + CSP_HEADER_LENGTH) {
-            csp_log_warn("Weird radio frame received! Size %u\r\n", len);
+            csp_log_warn("Length less than minimum expected! Size %u,"
+                         " expected %u (with ax25); dropping message\r\n", len,
+                         (int)sizeof(ax25_header_t) + CSP_HEADER_LENGTH);
+            return;
         }
 
         memcpy(&radio_header, buf, sizeof(ax25_header_t));
@@ -86,7 +89,10 @@ void csp_astrodev_rx (csp_iface_t *interface,
 
     } else {
         if (len < CSP_HEADER_LENGTH) {
-            csp_log_warn("Weird radio frame received! Size %u\r\n", len);
+            csp_log_warn("Length less than minimum expected! Size %u,"
+                         " expected %u; dropping message\r\n", len,
+                         CSP_HEADER_LENGTH);
+            return;
         }
     }
 
@@ -112,7 +118,10 @@ void csp_astrodev_rx (csp_iface_t *interface,
             csp_new_packet(packet, interface, xTaskWoken);
         }
         else {
-            csp_log_warn("Weird radio frame received! Size %u\r\n", packet->length);
+            csp_log_warn("Packet length %u did not meed specifications. Must be >="
+                         "%u and <= %u.  dropping message\r\n",
+                         packet->length, CSP_HEADER_LENGTH,
+                         interface->mtu + CSP_HEADER_LENGTH);
             interface->frame++;
             csp_buffer_free(packet);
         }
