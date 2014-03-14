@@ -20,8 +20,11 @@ extern "C" {
 
 typedef int (*csp_astrodev_putstr_f)(uint8_t *buf, int len);
 
+
+
 typedef struct csp_astrodev_handle_s {
     csp_astrodev_putstr_f radio_tx;
+    bool use_ax25_header;
 } csp_astrodev_handle_t;
 
 void csp_astrodev_rx (csp_iface_t *interface,
