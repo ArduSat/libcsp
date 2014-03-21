@@ -56,6 +56,13 @@ void * csp_buffer_get(size_t size);
 void * csp_buffer_get_isr(size_t buf_size);
 
 /**
+ * return the refcount of the given packet.
+ * @param packet pointer to memory area, must be acquired by csp_buffer_get().
+ */
+int csp_buffer_get_refcount(void *packet);
+
+
+/**
  * Free a buffer after use.
  * @param packet pointer to memory area, must be acquired by csp_buffer_get().
  */
