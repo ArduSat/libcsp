@@ -1,7 +1,7 @@
 /*
 Cubesat Space Protocol - A small network-layer protocol designed for Cubesats
 Copyright (C) 2012 GomSpace ApS (http://www.gomspace.com)
-Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk) 
+Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk)
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -17,7 +17,7 @@ You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
- 
+
 /* CAN frames contains at most 8 bytes of data, so in order to transmit CSP
  * packets larger than this, a fragmentation protocol is required. The CAN
  * Fragmentation Protocol (CFP) header is designed to match the 29 bit CAN
@@ -56,31 +56,34 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/arch/csp_thread.h>
 
 #include "../drivers/can/can.h"
+#include <csp/csp_buffer.h>
+
+
 
 /** CAN header macros */
-#define CFP_HOST_SIZE 	5
-#define CFP_TYPE_SIZE 	1
+#define CFP_HOST_SIZE	5
+#define CFP_TYPE_SIZE	1
 #define CFP_REMAIN_SIZE 8
-#define CFP_ID_SIZE 	10
+#define CFP_ID_SIZE		10
 
 /** Macros for extracting header fields */
 #define CFP_FIELD(id,rsiz,fsiz) ((uint32_t)((uint32_t)((id) >> (rsiz)) & (uint32_t)((1 << (fsiz)) - 1)))
-#define CFP_SRC(id) 		CFP_FIELD(id, CFP_HOST_SIZE + CFP_TYPE_SIZE + CFP_REMAIN_SIZE + CFP_ID_SIZE, CFP_HOST_SIZE)
-#define CFP_DST(id) 		CFP_FIELD(id, CFP_TYPE_SIZE + CFP_REMAIN_SIZE + CFP_ID_SIZE, CFP_HOST_SIZE)
-#define CFP_TYPE(id) 		CFP_FIELD(id, CFP_REMAIN_SIZE + CFP_ID_SIZE, CFP_TYPE_SIZE)
+#define CFP_SRC(id)			CFP_FIELD(id, CFP_HOST_SIZE + CFP_TYPE_SIZE + CFP_REMAIN_SIZE + CFP_ID_SIZE, CFP_HOST_SIZE)
+#define CFP_DST(id)			CFP_FIELD(id, CFP_TYPE_SIZE + CFP_REMAIN_SIZE + CFP_ID_SIZE, CFP_HOST_SIZE)
+#define CFP_TYPE(id)		CFP_FIELD(id, CFP_REMAIN_SIZE + CFP_ID_SIZE, CFP_TYPE_SIZE)
 #define CFP_REMAIN(id)		CFP_FIELD(id, CFP_ID_SIZE, CFP_REMAIN_SIZE)
-#define CFP_ID(id) 			CFP_FIELD(id, 0, CFP_ID_SIZE)
+#define CFP_ID(id)				CFP_FIELD(id, 0, CFP_ID_SIZE)
 
 /** Macros for building CFP headers */
 #define CFP_MAKE_FIELD(id,fsiz,rsiz) ((uint32_t)(((id) & (uint32_t)((uint32_t)(1 << (fsiz)) - 1)) << (rsiz)))
-#define CFP_MAKE_SRC(id) 	CFP_MAKE_FIELD(id, CFP_HOST_SIZE, CFP_HOST_SIZE + CFP_TYPE_SIZE + CFP_REMAIN_SIZE + CFP_ID_SIZE)
-#define CFP_MAKE_DST(id) 	CFP_MAKE_FIELD(id, CFP_HOST_SIZE, CFP_TYPE_SIZE + CFP_REMAIN_SIZE + CFP_ID_SIZE)
-#define CFP_MAKE_TYPE(id) 	CFP_MAKE_FIELD(id, CFP_TYPE_SIZE, CFP_REMAIN_SIZE + CFP_ID_SIZE)
+#define CFP_MAKE_SRC(id)	CFP_MAKE_FIELD(id, CFP_HOST_SIZE, CFP_HOST_SIZE + CFP_TYPE_SIZE + CFP_REMAIN_SIZE + CFP_ID_SIZE)
+#define CFP_MAKE_DST(id)	CFP_MAKE_FIELD(id, CFP_HOST_SIZE, CFP_TYPE_SIZE + CFP_REMAIN_SIZE + CFP_ID_SIZE)
+#define CFP_MAKE_TYPE(id)	CFP_MAKE_FIELD(id, CFP_TYPE_SIZE, CFP_REMAIN_SIZE + CFP_ID_SIZE)
 #define CFP_MAKE_REMAIN(id)	CFP_MAKE_FIELD(id, CFP_REMAIN_SIZE, CFP_ID_SIZE)
-#define CFP_MAKE_ID(id) 	CFP_MAKE_FIELD(id, CFP_ID_SIZE, 0)
+#define CFP_MAKE_ID(id)		CFP_MAKE_FIELD(id, CFP_ID_SIZE, 0)
 
 /** Mask to uniquely separate connections */
-#define CFP_ID_CONN_MASK 	(CFP_MAKE_SRC((uint32_t)(1 << CFP_HOST_SIZE) - 1) \
+#define CFP_ID_CONN_MASK	(CFP_MAKE_SRC((uint32_t)(1 << CFP_HOST_SIZE) - 1) \
 							| CFP_MAKE_DST((uint32_t)(1 << CFP_HOST_SIZE) - 1) \
 							| CFP_MAKE_ID((uint32_t)(1 << CFP_ID_SIZE) - 1))
 
@@ -123,7 +126,7 @@ static int id_init(void) {
 	/* Init ID field to random number */
 	srand((int)csp_get_ms());
 	cfp_id = rand() & ((1 << CFP_ID_SIZE) - 1);
-	
+
 	if (csp_bin_sem_create(&id_sem) == CSP_SEMAPHORE_OK) {
 		return CSP_ERR_NONE;
 	} else {
@@ -190,14 +193,14 @@ static int pbuf_init(void) {
 		}
 	}
 
-    /* Initialize global lock */
+	/* Initialize global lock */
 	if (CSP_INIT_CRITICAL(pbuf_sem) != CSP_ERR_NONE) {
 		csp_log_error("No more memory for packet buffer semaphore\r\n");
 		return CSP_ERR_NOMEM;
 	}
 
 	return CSP_ERR_NONE;
-	
+
 }
 
 /** pbuf_timestamp
@@ -223,17 +226,27 @@ int pbuf_timestamp(pbuf_element_t *buf, CSP_BASE_TYPE *task_woken) {
  * @return 0 on success, -1 on error.
  */
 static int pbuf_free(pbuf_element_t *buf, CSP_BASE_TYPE *task_woken) {
+	int32_t refcount;
 
 	/* Lock packet buffer */
 	if (task_woken == NULL)
 		CSP_ENTER_CRITICAL(pbuf_sem);
-		
+
 	/* Free CSP packet */
 	if (buf->packet != NULL) {
-		if (task_woken == NULL) {
-			csp_buffer_free(buf->packet);
-		} else {
-			csp_buffer_free_isr(buf->packet);
+
+		/* first check to see if the buffer was already free. This could happen
+           if the top level timeout occurred already. If so, no need to free it
+           again */
+		refcount = csp_buffer_get_refcount(buf->packet);
+		if (refcount > 0) {
+
+			if (task_woken == NULL) {
+				csp_buffer_free(buf->packet);
+			} else {
+				csp_buffer_free_isr(buf->packet);
+			}
+
 		}
 		buf->packet = NULL;
 	}
@@ -288,7 +301,7 @@ static pbuf_element_t *pbuf_new(uint32_t id, CSP_BASE_TYPE *task_woken) {
 
 	/* No free buffer was found */
 	return ret;
-  
+
 }
 
 
@@ -299,7 +312,7 @@ static pbuf_element_t *pbuf_new(uint32_t id, CSP_BASE_TYPE *task_woken) {
  * @return Pointer to matching or new packet buffer element on success, NULL on error.
  */
 static pbuf_element_t *pbuf_find(uint32_t id, uint32_t mask, CSP_BASE_TYPE *task_woken) {
-	
+
 	/* Search for matching buffer */
 	int i;
 	pbuf_element_t *buf, *ret = NULL;
@@ -345,8 +358,9 @@ static void pbuf_cleanup(void) {
 		if (buf->state == BUF_USED) {
 			/* Check timeout */
 			uint32_t now = csp_get_ms();
+
 			if (now - buf->last_used > PBUF_TIMEOUT_MS) {
-				csp_log_warn("CAN Buffer element timed out\r\n");
+				csp_log_info("CAN Buffer element timed out\r\n");
 				/* Reuse packet buffer */
 				pbuf_free(buf, NULL);
 			}
@@ -367,7 +381,7 @@ int csp_tx_callback(can_id_t canid, can_error_t error, CSP_BASE_TYPE *task_woken
 	pbuf_element_t *buf = pbuf_find(canid, CFP_ID_CONN_MASK, task_woken);
 
 	if (buf == NULL) {
-		csp_log_warn("Failed to match buffer element in tx callback\r\n");
+		csp_log_info("Failed to match buffer element in tx callback\r\n");
 		csp_if_can.tx_error++;
 		return CSP_ERR_INVAL;
 	}
@@ -398,7 +412,7 @@ int csp_tx_callback(can_id_t canid, can_error_t error, CSP_BASE_TYPE *task_woken
 			dest = buf->packet->id.dst;
 
 		/* Prepare identifier */
-		can_id_t id  = 0;
+		can_id_t id	 = 0;
 		id |= CFP_MAKE_SRC(buf->packet->id.src);
 		id |= CFP_MAKE_DST(dest);
 		id |= CFP_MAKE_ID(CFP_ID(canid));
@@ -410,7 +424,7 @@ int csp_tx_callback(can_id_t canid, can_error_t error, CSP_BASE_TYPE *task_woken
 
 		/* Send frame */
 		if (can_send(id, buf->packet->data + buf->tx_count - bytes, bytes, task_woken) != 0) {
-			csp_log_warn("Failed to send CAN frame in Tx callback\r\n");
+			csp_log_info("Failed to send CAN frame in Tx callback\r\n");
 			csp_if_can.tx_error++;
 			pbuf_free(buf, task_woken);
 			return CSP_ERR_DRIVER;
@@ -418,7 +432,7 @@ int csp_tx_callback(can_id_t canid, can_error_t error, CSP_BASE_TYPE *task_woken
 	} else {
 		/* Free packet buffer */
 		pbuf_free(buf, task_woken);
-		
+
 		/* Post semaphore if blocking mode is enabled */
 		if (task_woken != NULL) {
 			csp_bin_sem_post_isr(&buf->tx_sem, task_woken);
@@ -442,7 +456,7 @@ static int csp_can_process_frame(can_frame_t *frame) {
 
 	pbuf_element_t *buf;
 	uint8_t offset;
-	
+
 	can_id_t id = frame->id;
 
 	/* Bind incoming frame to a packet buffer */
@@ -470,7 +484,7 @@ static int csp_can_process_frame(can_frame_t *frame) {
 	switch (CFP_TYPE(id)) {
 
 		case CFP_BEGIN:
-		
+
 			/* Discard packet if DLC is less than CSP id + CSP length fields */
 			if (frame->dlc < sizeof(csp_id_t) + sizeof(uint16_t)) {
 				csp_log_warn("Short BEGIN frame received\r\n");
@@ -478,7 +492,7 @@ static int csp_can_process_frame(can_frame_t *frame) {
 				pbuf_free(buf, NULL);
 				break;
 			}
-						
+
 			/* Check for incomplete frame */
 			if (buf->packet != NULL) {
 				/* Reuse the buffer */
@@ -500,10 +514,10 @@ static int csp_can_process_frame(can_frame_t *frame) {
 			buf->packet->id.ext = csp_ntoh32(buf->packet->id.ext);
 			memcpy(&(buf->packet->length), frame->data + sizeof(csp_id_t), sizeof(uint16_t));
 			buf->packet->length = csp_ntoh16(buf->packet->length);
-			
+
 			/* Reset RX count */
 			buf->rx_count = 0;
-			
+
 			/* Set offset to prevent CSP header from being copied to CSP data */
 			offset = sizeof(csp_id_t) + sizeof(uint16_t);
 
@@ -511,7 +525,7 @@ static int csp_can_process_frame(can_frame_t *frame) {
 			buf->remain = CFP_REMAIN(id) + 1;
 
 			/* Note fall through! */
-			
+
 		case CFP_MORE:
 
 			/* Check 'remain' field match */
@@ -593,7 +607,7 @@ int csp_can_tx(csp_iface_t * interface, csp_packet_t *packet, uint32_t timeout) 
 		csp_log_warn("Failed to get CFP identification number\r\n");
 		return CSP_ERR_INVAL;
 	}
-	
+
 	/* Calculate overhead */
 	overhead = sizeof(csp_id_t) + sizeof(uint16_t);
 
@@ -641,7 +655,7 @@ int csp_can_tx(csp_iface_t * interface, csp_packet_t *packet, uint32_t timeout) 
 
 	/* Send frame */
 	if (can_send(id, frame_buf, overhead + bytes, NULL) != 0) {
-		csp_log_warn("Failed to send CAN frame in csp_tx_can\r\n");
+		csp_log_info("Failed to send CAN frame in csp_tx_can\r\n");
 		return CSP_ERR_DRIVER;
 	}
 
@@ -676,7 +690,7 @@ int csp_can_init(uint8_t mode, struct csp_can_config *conf) {
 		csp_log_error("Failed to initialize CAN identification number\r\n");
 		return CSP_ERR_NOMEM;
 	}
-	
+
 	if (mode == CSP_CAN_MASKED) {
 		mask = CFP_MAKE_DST((1 << CFP_HOST_SIZE) - 1);
 	} else if (mode == CSP_CAN_PROMISC) {
@@ -692,7 +706,7 @@ int csp_can_init(uint8_t mode, struct csp_can_config *conf) {
 		csp_log_error("Failed to create CAN RX queue\r\n");
 		return CSP_ERR_NOMEM;
 	}
-	
+
 	ret = csp_thread_create(csp_can_rx_task, (signed char *) "CAN", 4000/sizeof(int), NULL, 3, &can_rx_task);
 	if (ret != 0) {
 		csp_log_error("Failed to init CAN RX task\r\n");

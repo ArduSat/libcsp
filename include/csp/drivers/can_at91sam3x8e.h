@@ -30,6 +30,8 @@ extern "C" {
 #endif
 
     int can_reset (int8_t index);
+    uint8_t can_get_reset_cnt (void);
+    uint8_t can_get_active_idx (void);
 
 #ifdef __cplusplus
 } /* extern "C" */

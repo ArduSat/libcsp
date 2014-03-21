@@ -58,12 +58,15 @@
 #define CAN_RX_TCR_MASK (CAN_TCR_MB4 | CAN_TCR_MB5 | CAN_TCR_MB6 | CAN_TCR_MB7)
 #define CAN_RX_IER_MASK (0x00000000 | CAN_IER_MB4 | CAN_IER_MB5 |  \
 												 CAN_IER_MB6 | CAN_IER_MB7)
+
 #define is_tx_mailbox(m)	(m < CAN_RX_MBOX_BEGIN_IDX)
 #define is_rx_mailbox(m)	(!is_tx_mailbox(m))
 
 // # of attempts to write and read data from registers.
 #define WRITE_TRIES 3
 #define READ_TRIES 3
+#define RESET_TRIES 3
+#define RESET_DISABLE_WAIT_MS 500
 
 // Data specific to the two CAN devices
 uint8_t CAN_IDS[] = {ID_CAN0,ID_CAN1};
@@ -73,6 +76,7 @@ char* can_ifcs[] = {"CAN0","CAN1"};
 // callback functions
 can_tx_callback_t txcbs[] = {NULL,NULL};
 can_rx_callback_t rxcbs[] = {NULL,NULL};
+uint8_t can_reset_count[] = {0,0};
 
 // Indices for the above arrays
 #define CAN0_INDEX 0
@@ -99,6 +103,7 @@ struct csp_can_config stored_configs[NUM_CAN_DEVICES];
 uint32_t stored_baudrate_kbps[NUM_CAN_DEVICES];
 // ISR prototype
 static void can_isr (uint8_t dev);
+int can_reset_entry_point (int8_t index);
 
 
 /**
@@ -107,13 +112,14 @@ static void can_isr (uint8_t dev);
  * @param id - CAN id, calculated by CSP node
  * @param mask - rx id mask for rx mailboxes
  * @param atxcb - tx callback (triggers csp_if_can to send followup frame
- *  in broken up messages)
+ *	in broken up messages)
  * @param arxcb - rx callback
  * @param conf - requires all three fields to be included.
  * @return 0 on success, -1 on error.
  */
 int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 							can_rx_callback_t arxcb, struct csp_can_config *conf) {
+
 	uint32_t baudrate_kbps;
 
 	if (curr_idx != INVALID_INDEX) {
@@ -153,28 +159,66 @@ int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 	stored_masks[curr_idx] = mask;
 	stored_configs[curr_idx] = *conf;
 	stored_baudrate_kbps[curr_idx] = baudrate_kbps;
-	return can_reset(curr_idx);
+	return can_reset_entry_point(curr_idx);
 }
 
 
 /**
  * can_reset
+ * reset the can
+ * @index the index of the device
+ * @return 0 on success, -1 on error, -2 if not enabled.
+ */
+
+int can_reset(int8_t index) {
+	uint8_t reset_attempts = 0;
+	int status = 0;
+
+	if (index != curr_idx) return -1;
+
+	// we may need to do this a couple times because errant leftover
+	// ISRs and the like may try to access CAN during this time, and
+	// causing additional rx/tx errors.
+	do {
+
+		// disabling resets the system registers
+		can_disable(p_cans[curr_idx]);
+		vTaskDelay(RESET_DISABLE_WAIT_MS);
+
+		if (can_reset_entry_point(index) != 0) {
+			status = -1;
+			break;
+		}
+		if (++reset_attempts > RESET_TRIES) {
+			status = -1;
+			break;
+		}
+
+	} while (can_get_rx_error_cnt(p_cans[curr_idx]) ||
+			 can_get_tx_error_cnt(p_cans[curr_idx]));
+
+	if (status == 0) {
+		can_reset_count[curr_idx]++;
+	}
+
+	return status;
+}
+
+
+/**
+ * can_reset_entry_point
  * this used to be part of can_init, but we allow an entry for resetting the
  * device without necessarily changing the top level configuration.
  * @index the index of the device
  * @return 0 on success, -1 on error, -2 if not enabled.
  */
-int can_reset (int8_t index) {
+int can_reset_entry_point (int8_t index) {
 	uint8_t mbox;
 
 	// chck against current index.
 	if (index != curr_idx) {
 		return -2;
 	}
-
-	// set the can to disable, and wait a bit
-	//can_disable(p_cans[curr_idx]);
-	//vTaskDelay(configTICK_RATE_HZ);
 
 	// initialize the sam3x drivers
 	if (can_init_hw(p_cans[curr_idx],stored_configs[curr_idx].clock_speed,
@@ -219,6 +263,25 @@ int can_reset (int8_t index) {
 
 
 /**
+ * can_get_reset_cnt
+ * returns the reset count of the current device
+ * @return count
+ */
+uint8_t can_get_reset_cnt (void) {
+	return can_reset_count[curr_idx];
+}
+
+/**
+ * can_get_active_idx
+ * returns curr_idx
+ * @return curr_idx
+ */
+uint8_t can_get_active_idx (void) {
+	return curr_idx;
+}
+
+
+/**
  * can_send
  * implements csp_if_can.h prototype; sends out data message
  * @param id - CSP generated can ID
@@ -227,15 +290,29 @@ int can_reset (int8_t index) {
  * @param task_woken - used to determine whether to enter critical section.
  * @return 0 on success, -1 on error.
  */
-
 int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 							CSP_BASE_TYPE * task_woken) {
 
 	int32_t i, m = -1, wc = 0;
 	uint32_t temp[2];
+	uint32_t can_status;
+	uint32_t can_mr;
 
 	if (curr_idx == INVALID_INDEX) {
 		csp_log_warn("can_send: CAN device not initialized.\r\n");
+		return -1;
+	}
+
+	can_mr = p_cans[curr_idx]->CAN_MR;
+	can_status = can_get_status(p_cans[curr_idx]);
+
+	// Check to see if can is disabled. If so, return error.
+	if (!(can_mr & CAN_MR_CANEN)) {
+		return -1;
+	}
+
+	// Check to see if in bus off mode. If so, return error.
+	if (can_status & CAN_SR_BOFF) {
 		return -1;
 	}
 
@@ -260,7 +337,9 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 
 	// Return if no available mailbox was found
 	if (m < 0) {
-		csp_log_error("TX overflow, no available mailbox\r\n");
+		// in our case, filled mailboxes are a bad issue. It means there is a
+		// degenerate state, so we issue a can reset.
+		can_reset(curr_idx);
 		return -1;
 	}
 

@@ -1,7 +1,7 @@
 /*
 Cubesat Space Protocol - A small network-layer protocol designed for Cubesats
 Copyright (C) 2012 GomSpace ApS (http://www.gomspace.com)
-Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk) 
+Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk)
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -168,6 +168,17 @@ void csp_buffer_free_isr(void *packet) {
 		csp_queue_enqueue_isr(csp_buffers, &buf, &task_woken);
 	}
 
+}
+
+
+int csp_buffer_get_refcount(void *packet) {
+	if (!packet) {
+		csp_log_error("Attempt to free null pointer\r\n");
+		return -1;
+	}
+
+	csp_skbf_t * buf = packet - sizeof(csp_skbf_t);
+    return buf->refcount;
 }
 
 void csp_buffer_free(void *packet) {
