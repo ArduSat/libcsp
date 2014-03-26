@@ -19,6 +19,7 @@
 #include <csp/arch/csp_malloc.h>
 
 #define ASTRODEV_PACKET_SIZE 255
+#define NUM_ASTRODEV_MODULES 2
 
 typedef struct __attribute__((__packed__)) {
     uint8_t dst_callsign[6];
@@ -31,6 +32,10 @@ typedef struct __attribute__((__packed__)) {
     uint8_t pid;
 } ax25_header_t;
 
+// To provide information to beacon for some of its algorithms.
+// Note: this gets reset externally.
+csp_id_t latest_csp_transfer_id[NUM_ASTRODEV_MODULES] = {0x0,0x0};
+
 static int csp_astrodev_tx (csp_iface_t *interface,
                             csp_packet_t *packet, uint32_t timeout) {
     int ret = CSP_ERR_NONE;
@@ -42,6 +47,9 @@ static int csp_astrodev_tx (csp_iface_t *interface,
 
     if (txbuf == NULL)
         return CSP_ERR_NOMEM;
+
+    if (driver->module < NUM_ASTRODEV_MODULES)
+        latest_csp_transfer_id[driver->module] = packet->id;
 
     /* Save the outgoing id in the buffer */
     packet->id.ext = csp_hton32(packet->id.ext);
@@ -116,6 +124,9 @@ void csp_astrodev_rx (csp_iface_t *interface,
             packet->id.ext = csp_ntoh32(packet->id.ext);
 
             csp_new_packet(packet, interface, xTaskWoken);
+
+            if (handle->module < NUM_ASTRODEV_MODULES)
+                latest_csp_transfer_id[handle->module] = packet->id;
         }
         else {
             csp_log_warn("Packet length %u did not meed specifications. Must be >="
