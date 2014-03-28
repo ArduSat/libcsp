@@ -472,8 +472,6 @@ void can_isr (uint8_t dev) {
 
 				if (is_rx_mailbox(m)) {
 
-                    printf("rx isr %u\r\n",m);
-
 					// update our mailbox config. must update ul status before read
 					mbox_configs[curr_idx][m].ul_status = mb_status;
 
