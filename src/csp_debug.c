@@ -105,7 +105,10 @@ void do_csp_debug(csp_debug_level_t level, const char * format, ...) {
 		vfprintf_P(stdout, format, args);
 #else
 #ifdef __linux__
-    vsyslog(LOG_INFO, format, args);
+		va_list args2;
+		va_copy(args2, args);
+    		vsyslog(LOG_INFO, format, args2);
+		va_end(args2);
 #endif
 		vprintf(format, args);
 #endif
