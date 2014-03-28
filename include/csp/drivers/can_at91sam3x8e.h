@@ -32,6 +32,7 @@ extern "C" {
     int can_reset (int8_t index);
     uint8_t can_get_reset_cnt (void);
     uint8_t can_get_active_idx (void);
+    uint8_t can_get_num_free_tx_mboxes (uint8_t idx);
 
 #ifdef __cplusplus
 } /* extern "C" */

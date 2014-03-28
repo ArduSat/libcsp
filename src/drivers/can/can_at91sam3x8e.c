@@ -65,7 +65,7 @@
 // # of attempts to write and read data from registers.
 #define WRITE_TRIES 3
 #define READ_TRIES 3
-#define RESET_TRIES 3
+#define RESET_TRIES 10
 #define RESET_DISABLE_WAIT_MS 500
 
 // Data specific to the two CAN devices
@@ -77,7 +77,7 @@ char* can_ifcs[] = {"CAN0","CAN1"};
 can_tx_callback_t txcbs[] = {NULL,NULL};
 can_rx_callback_t rxcbs[] = {NULL,NULL};
 uint8_t can_reset_count[] = {0,0};
-
+uint8_t can_in_middle_of_reset = false;
 // Indices for the above arrays
 #define CAN0_INDEX 0
 #define CAN1_INDEX 1
@@ -173,33 +173,54 @@ int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 int can_reset(int8_t index) {
 	uint8_t reset_attempts = 0;
 	int status = 0;
+    uint8_t consecutive_good = 0;
+
+    // if an ISR occurs it will try to read from the device. This makes
+    // sure the read doesn't occur during reset.
+    can_in_middle_of_reset = true;
 
 	if (index != curr_idx) return -1;
 
 	// we may need to do this a couple times because errant leftover
 	// ISRs and the like may try to access CAN during this time, and
 	// causing additional rx/tx errors.
-	do {
+
+	status = -1;
+    while (reset_attempts++ < RESET_TRIES) {
 
 		// disabling resets the system registers
-		can_disable(p_cans[curr_idx]);
+		if (consecutive_good == 0) can_disable(p_cans[curr_idx]);
+
 		vTaskDelay(RESET_DISABLE_WAIT_MS);
 
-		if (can_reset_entry_point(index) != 0) {
-			status = -1;
-			break;
-		}
-		if (++reset_attempts > RESET_TRIES) {
-			status = -1;
-			break;
-		}
+        if (consecutive_good == 0) {
+            if (can_reset_entry_point(index) != 0) {
+                status = -1;
+                break;
+            }
+        }
 
-	} while (can_get_rx_error_cnt(p_cans[curr_idx]) ||
-			 can_get_tx_error_cnt(p_cans[curr_idx]));
+        if (can_get_rx_error_cnt(p_cans[curr_idx]) == 0 &&
+            can_get_tx_error_cnt(p_cans[curr_idx]) == 0) {
+            // want to have two consecutive clean systems before we claim success.
+            consecutive_good++;
+        } else {
+            // reset to 0
+            consecutive_good = 0;
+        }
+
+        // heuristically, 3 seemed to be pretty good.
+        if (consecutive_good >= 3) {
+            status = 0; // good!
+            break;
+        }
+	}
 
 	if (status == 0) {
 		can_reset_count[curr_idx]++;
 	}
+
+    can_in_middle_of_reset = false; // allow ISRs to read and do things
 
 	return status;
 }
@@ -280,6 +301,25 @@ uint8_t can_get_active_idx (void) {
 	return curr_idx;
 }
 
+/**
+ * can_get_num_free_tx_mboxes
+ * returns number of free tx mailboxes. If 0, usually that means there
+ * is a problem with the bus. (CAN bus constipation)
+ * @param idx = index of device you're requesting
+ * @return number of free tx mboxes
+ */
+uint8_t can_get_num_free_tx_mboxes (uint8_t idx) {
+    uint8_t i;
+    uint8_t sum = 0;
+
+	for(i = 0; i < CAN_TX_MBOXES; i++) {
+		if (mbox_tx_statuses[idx][i] == MBOX_TX_FREE) {
+            sum++;
+        }
+    }
+	return sum;
+}
+
 
 /**
  * can_send
@@ -311,6 +351,11 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 		return -1;
 	}
 
+    // Check to see if in the middle of reset.
+    if (can_in_middle_of_reset) {
+        return -1;
+    }
+
 	// Check to see if in bus off mode. If so, return error.
 	if (can_status & CAN_SR_BOFF) {
 		return -1;
@@ -337,9 +382,6 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 
 	// Return if no available mailbox was found
 	if (m < 0) {
-		// in our case, filled mailboxes are a bad issue. It means there is a
-		// degenerate state, so we issue a can reset.
-		can_reset(curr_idx);
 		return -1;
 	}
 
@@ -408,6 +450,7 @@ void can_isr (uint8_t dev) {
 	portBASE_TYPE task_woken = pdFALSE;
 	can_frame_t frame;
 
+
 	// Make sure that the handler is for the currently activated device.
 	if (curr_idx != dev) {
 		printf("Unexpected device index %d\r\n",dev);
@@ -428,6 +471,8 @@ void can_isr (uint8_t dev) {
 			if ((mb_status & CAN_MSR_MRDY) == CAN_MSR_MRDY) {
 
 				if (is_rx_mailbox(m)) {
+
+                    printf("rx isr %u\r\n",m);
 
 					// update our mailbox config. must update ul status before read
 					mbox_configs[curr_idx][m].ul_status = mb_status;
