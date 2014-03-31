@@ -40,35 +40,46 @@ int csp_ping(uint8_t node, uint32_t timeout, unsigned int size, uint8_t conn_opt
 
 	/* Open connection */
 	csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, node, CSP_PING, timeout, conn_options);
-	if (conn == NULL)
-		return -1;
+	if (conn == NULL) {
+		return CSP_PING_SEND_ERR;;
+	}
 
 	/* Prepare data */
 	csp_packet_t * packet;
 	packet = csp_buffer_get(size);
-	if (packet == NULL)
+	if (packet == NULL) {
+		status = CSP_PING_SEND_ERR;
 		goto out;
+	}
 
 	/* Set data to increasing numbers */
 	packet->length = size;
-	for (i = 0; i < size; i++)
+	for (i = 0; i < size; i++) {
 		packet->data[i] = i;
+	}
 
 	/* Try to send frame */
-	if (!csp_send(conn, packet, 0))
+	if (!csp_send(conn, packet, 0)) {
+		status = CSP_PING_SEND_ERR;
 		goto out;
+	}
 
 	/* Read incoming frame */
 	packet = csp_read(conn, timeout);
-	if (packet == NULL)
+	if (packet == NULL) {
+		status = CSP_PING_TIMEOUT;
 		goto out;
+	}
 
 	/* Ensure that the data was actually echoed */
-	for (i = 0; i < size; i++)
-		if (packet->data[i] != i % (0xff + 1))
+	for (i = 0; i < size; i++) {
+		if (packet->data[i] != i % (0xff + 1)) {
+			status = CSP_PING_BAD_ACK;
 			goto out;
+		}
+	}
 
-	status = 1;
+	status = CSP_PING_SUCCESS;
 
 out:
 	/* Clean up */
@@ -79,10 +90,10 @@ out:
 	/* We have a reply */
 	time = (csp_get_ms() - start);
 
-	if (status) {
+	if (status == CSP_PING_SUCCESS) {
 		return time;
 	} else {
-		return -1;
+		return status;
 	}
 
 }

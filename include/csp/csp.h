@@ -179,6 +179,12 @@ typedef union {
 #define CSP_O_CRC32			CSP_SO_CRC32REQ		// Enable CRC32
 #define CSP_O_NOCRC32		CSP_SO_CRC32PROHIB	// Disable CRC32
 
+#define CSP_PING_SUCCESS	0
+#define CSP_PING_TIMEOUT	-1
+#define CSP_PING_SEND_ERR	-2
+#define CSP_PING_BAD_ACK	-3
+
+
 /**
  * CSP PACKET STRUCTURE
  * Note: This structure is constructed to fit
