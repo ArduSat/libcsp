@@ -20,7 +20,19 @@ extern "C" {
 
 typedef int (*csp_astrodev_putstr_f)(uint8_t *buf, int len);
 
+#define ASTRODEV_PACKET_SIZE 255
+#define NUM_ASTRODEV_MODULES 2
 
+typedef struct __attribute__((__packed__)) {
+    uint8_t dst_callsign[6];
+    uint8_t dst_ssid;
+    uint8_t src_callsign[6];
+    uint8_t src_ssid;
+    uint8_t digi_callsign[6];
+    uint8_t digi_ssid;
+    uint8_t control;
+    uint8_t pid;
+} ax25_header_t;
 
 typedef struct csp_astrodev_handle_s {
     csp_astrodev_putstr_f radio_tx;
