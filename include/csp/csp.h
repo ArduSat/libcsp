@@ -227,6 +227,11 @@ typedef struct csp_iface_s {
 	struct csp_iface_s *next;	/**< Next interface */
 } csp_iface_t;
 
+/** Debug Functions
+* Prints the binary contents of packet to stderr
+*/
+void debug_inspect_packet(char * msg, csp_packet_t * packet);
+
 /**
  * This define must be equal to the size of the packet overhead in csp_packet_t.
  * It is used in csp_buffer_get() to check the allocated buffer size against
