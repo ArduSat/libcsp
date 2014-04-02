@@ -18,20 +18,6 @@
 #include <csp/interfaces/csp_if_astrodev.h>
 #include <csp/arch/csp_malloc.h>
 
-#define ASTRODEV_PACKET_SIZE 255
-#define NUM_ASTRODEV_MODULES 2
-
-typedef struct __attribute__((__packed__)) {
-    uint8_t dst_callsign[6];
-    uint8_t dst_ssid;
-    uint8_t src_callsign[6];
-    uint8_t src_ssid;
-    uint8_t digi_callsign[6];
-    uint8_t digi_ssid;
-    uint8_t control;
-    uint8_t pid;
-} ax25_header_t;
-
 // To provide information to beacon for some of its algorithms.
 // Note: this gets reset externally.
 csp_id_t latest_csp_transfer_id[NUM_ASTRODEV_MODULES] = {0x0,0x0};
