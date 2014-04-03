@@ -173,11 +173,11 @@ int can_init (uint32_t id, uint32_t mask, can_tx_callback_t atxcb,
 int can_reset(int8_t index) {
 	uint8_t reset_attempts = 0;
 	int status = 0;
-    uint8_t consecutive_good = 0;
+	uint8_t consecutive_good = 0;
 
-    // if an ISR occurs it will try to read from the device. This makes
-    // sure the read doesn't occur during reset.
-    can_in_middle_of_reset = true;
+	// if an ISR occurs it will try to read from the device. This makes
+	// sure the read doesn't occur during reset.
+	can_in_middle_of_reset = true;
 
 	if (index != curr_idx) return -1;
 
@@ -186,41 +186,41 @@ int can_reset(int8_t index) {
 	// causing additional rx/tx errors.
 
 	status = -1;
-    while (reset_attempts++ < RESET_TRIES) {
+	while (reset_attempts++ < RESET_TRIES) {
 
 		// disabling resets the system registers
 		if (consecutive_good == 0) can_disable(p_cans[curr_idx]);
 
 		vTaskDelay(RESET_DISABLE_WAIT_MS);
 
-        if (consecutive_good == 0) {
-            if (can_reset_entry_point(index) != 0) {
-                status = -1;
-                break;
-            }
-        }
+		if (consecutive_good == 0) {
+			if (can_reset_entry_point(index) != 0) {
+				status = -1;
+				break;
+			}
+		}
 
-        if (can_get_rx_error_cnt(p_cans[curr_idx]) == 0 &&
-            can_get_tx_error_cnt(p_cans[curr_idx]) == 0) {
-            // want to have two consecutive clean systems before we claim success.
-            consecutive_good++;
-        } else {
-            // reset to 0
-            consecutive_good = 0;
-        }
+		if (can_get_rx_error_cnt(p_cans[curr_idx]) == 0 &&
+			can_get_tx_error_cnt(p_cans[curr_idx]) == 0) {
+			// want to have two consecutive clean systems before we claim success.
+			consecutive_good++;
+		} else {
+			// reset to 0
+			consecutive_good = 0;
+		}
 
-        // heuristically, 3 seemed to be pretty good.
-        if (consecutive_good >= 3) {
-            status = 0; // good!
-            break;
-        }
+		// heuristically, 3 seemed to be pretty good.
+		if (consecutive_good >= 3) {
+			status = 0; // good!
+			break;
+		}
 	}
 
 	if (status == 0) {
 		can_reset_count[curr_idx]++;
 	}
 
-    can_in_middle_of_reset = false; // allow ISRs to read and do things
+	can_in_middle_of_reset = false; // allow ISRs to read and do things
 
 	return status;
 }
@@ -309,14 +309,14 @@ uint8_t can_get_active_idx (void) {
  * @return number of free tx mboxes
  */
 uint8_t can_get_num_free_tx_mboxes (uint8_t idx) {
-    uint8_t i;
-    uint8_t sum = 0;
+	uint8_t i;
+	uint8_t sum = 0;
 
 	for(i = 0; i < CAN_TX_MBOXES; i++) {
 		if (mbox_tx_statuses[idx][i] == MBOX_TX_FREE) {
-            sum++;
-        }
-    }
+			sum++;
+		}
+	}
 	return sum;
 }
 
@@ -351,10 +351,10 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 		return -1;
 	}
 
-    // Check to see if in the middle of reset.
-    if (can_in_middle_of_reset) {
-        return -1;
-    }
+	// Check to see if in the middle of reset.
+	if (can_in_middle_of_reset) {
+		return -1;
+	}
 
 	// Check to see if in bus off mode. If so, return error.
 	if (can_status & CAN_SR_BOFF) {
@@ -449,7 +449,7 @@ void can_isr (uint8_t dev) {
 	int32_t rc = 0;
 	portBASE_TYPE task_woken = pdFALSE;
 	can_frame_t frame;
-
+	uint8_t events_occurred;
 
 	// Make sure that the handler is for the currently activated device.
 	if (curr_idx != dev) {
@@ -457,34 +457,46 @@ void can_isr (uint8_t dev) {
 		return;
 	}
 
-	// Run through the mailboxes
-	for (m = 0; m < CAN_MBOXES; m++) {
+	do {
+		// repeat while there is still incoming mailbox data. Stop when there
+		// is no new data.
+		events_occurred = false;
 
 		// first, check mailbox status from the device
 		dev_status = can_get_status(p_cans[curr_idx]);
 
-		if (dev_status & (1 << m)) {
+		// Run through the mailboxes
+		for (m = 0; m < CAN_MBOXES; m++) {
 
-			// next, check status from the mailbox itself to see if it's ready.
+			// next, double check status from the
+			// mailbox itself to see if it's ready.
 			mb_status = can_mailbox_get_status(p_cans[curr_idx], m);
 
-			if ((mb_status & CAN_MSR_MRDY) == CAN_MSR_MRDY) {
+			if ((dev_status & (1 << m)) &&
+				((mb_status & CAN_MSR_MRDY) == CAN_MSR_MRDY)) {
+				// when an rx mailbox is ready, it has data.
+				// when a tx mailbox is ready, it is empty.
 
 				if (is_rx_mailbox(m)) {
 
-					// update our mailbox config. must update ul status before read
+					events_occurred = true;
+
+					// update our mailbox config.
+					// must update ul status before read
 					mbox_configs[curr_idx][m].ul_status = mb_status;
 
 					// attempt to read the mailbox
 					rc = 0;
 
-					while (can_mailbox_read(p_cans[curr_idx], &mbox_configs[curr_idx][m])
-								 != CAN_MAILBOX_TRANSFER_OK)
+					while (can_mailbox_read(p_cans[curr_idx],
+											&mbox_configs[curr_idx][m])
+						   != CAN_MAILBOX_TRANSFER_OK)
 						{
 
 							if (++rc == READ_TRIES) {
-								printf("can_mailbox_read call returned unsuccessfully after %d attempts.\r\n",
-											 READ_TRIES);
+								printf("can_mailbox_read call returned "
+									   "unsuccessfully after %d attempts.\r\n",
+									   READ_TRIES);
 								return;
 							}
 						}
@@ -492,39 +504,43 @@ void can_isr (uint8_t dev) {
 					frame.dlc = mbox_configs[curr_idx][m].uc_length;
 
 					uint32_t temp[] = {mbox_configs[curr_idx][m].ul_datah,
-														 mbox_configs[curr_idx][m].ul_datal};
+									   mbox_configs[curr_idx][m].ul_datal};
 
 					switch (frame.dlc) {
-					case 8:
-						frame.data[7] = *(((uint8_t *) &(temp[0])) + 3);
-					case 7:
-						frame.data[6] = *(((uint8_t *) &(temp[0])) + 2);
-					case 6:
-						frame.data[5] = *(((uint8_t *) &(temp[0])) + 1);
-					case 5:
-						frame.data[4] = *(((uint8_t *) &(temp[0])) + 0);
-					case 4:
-						frame.data[3] = *(((uint8_t *) &(temp[1])) + 3);
-					case 3:
-						frame.data[2] = *(((uint8_t *) &(temp[1])) + 2);
-					case 2:
-						frame.data[1] = *(((uint8_t *) &(temp[1])) + 1);
-					case 1:
-						frame.data[0] = *(((uint8_t *) &(temp[1])) + 0);
-					default:
-						break;
+						case 8:
+							frame.data[7] = *(((uint8_t *) &(temp[0])) + 3);
+						case 7:
+							frame.data[6] = *(((uint8_t *) &(temp[0])) + 2);
+						case 6:
+							frame.data[5] = *(((uint8_t *) &(temp[0])) + 1);
+						case 5:
+							frame.data[4] = *(((uint8_t *) &(temp[0])) + 0);
+						case 4:
+							frame.data[3] = *(((uint8_t *) &(temp[1])) + 3);
+						case 3:
+							frame.data[2] = *(((uint8_t *) &(temp[1])) + 2);
+						case 2:
+							frame.data[1] = *(((uint8_t *) &(temp[1])) + 1);
+						case 1:
+							frame.data[0] = *(((uint8_t *) &(temp[1])) + 0);
+						default:
+							break;
 
 					}
 
-					//note: can_mailbox_read does not load the proper (full) ID that
-					//we want, so we have to grab it manually.
+					//note: can_mailbox_read does not load the proper (full)
+					//ID that we want, so we have to grab it manually.
 					frame.id = p_cans[curr_idx]->CAN_MB[m].CAN_MID;
 
 					// Call RX Callback
 					if (rxcbs[curr_idx] != NULL)
 						(rxcbs[curr_idx])(&frame, &task_woken);
 
-				} else if (is_tx_mailbox(m) && mbox_tx_statuses[curr_idx][m] != MBOX_TX_FREE) {
+				} else if (is_tx_mailbox(m)
+						   && mbox_tx_statuses[curr_idx][m]
+						   != MBOX_TX_FREE) {
+
+					events_occurred = true;
 
 					// We have transferred the data
 
@@ -543,7 +559,6 @@ void can_isr (uint8_t dev) {
 					mbox_tx_statuses[curr_idx][m] = MBOX_TX_FREE;
 				}
 			}
-		}
-	}
-
+		} // for
+	} while (events_occurred); // while
 }
