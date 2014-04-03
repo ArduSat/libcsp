@@ -27,6 +27,9 @@
 */
 #include <stdint.h>
 
+#include <csp/csp.h>
+
+#include "csp_xtea.h"
 #include "csp_aes256.h"
 
 #ifdef CSP_USE_XTEA
@@ -54,7 +57,7 @@ int csp_xtea_decrypt(uint8_t * cipher, const uint32_t len, uint32_t iv[2]) {
     aes_iv[2] = 0;
     aes_iv[3] = iv[1];
 
-    return csp_aes256_encrypt(plain, len, aes_iv);
+    return csp_aes256_decrypt(cipher, len, aes_iv);
 }
 
 #endif //CSP_USE_XTEA

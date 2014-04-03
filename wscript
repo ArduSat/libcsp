@@ -185,15 +185,16 @@ def configure(ctx):
 
 	if ctx.options.replace_xtea_with_aes256:
 		print ""
-		print "    ***       NOTE: Lemur-1 *ONLY* Licensing Restriction Hack           ***"
+		print "    ***       NOTE: Lemur-1 *ONLY* Licensing Restriction Hack           *** "
 		print ""
-		print "    Due to licensing restrictions, Lemur-1 requires AES256 instead of XTEA    "
-		print "    encryption.  To minimize code disruption, we silently substitute AES256   "
-		print "    for the XTEA algorithm.  Function and flag names remain the same.         "
-		print "    You should only see this compilation warning during Lemur-1 development.  "
+		print "    Due to licensing restrictions, Lemur-1 requires AES256 instead of XTEA  "
+		print "    encryption.  To minimize code disruption, we silently substitute AES256 "
+		print "    for the XTEA algorithm.  Function and flag names remain the same.       "
+		print "    You should only see this compilation warning during Lemur-1 development "
 		print ""
 		ctx.env['FILES_CSP'].remove('src/crypto/csp_xtea.c')
-		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_xtea_to_aes256.c')
+		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256.c')
+		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256_as_xtea.c')
 
 	ctx.define_cond('CSP_DEBUG', not ctx.options.disable_debug)
 	ctx.define_cond('CSP_DISABLE_OUTPUT', ctx.options.disable_output)
