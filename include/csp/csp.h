@@ -187,6 +187,11 @@ typedef union {
 #define CSP_O_DEFAULT CSP_O_NONE
 #endif
 
+// AIS is a CSP appliance.  We can't replace XTEA with AES256 there.
+#ifndef CSP_O_AIS_DEFAULT
+#define CSP_O_AIS_DEFAULT CSP_O_NONE
+#endif
+
 #define CSP_PING_SUCCESS	0
 #define CSP_PING_TIMEOUT	-1
 #define CSP_PING_SEND_ERR	-2
