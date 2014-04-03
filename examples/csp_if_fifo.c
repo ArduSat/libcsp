@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
                 strcpy((char *) packet->data, message);
                 packet->length = strlen(message);
                 
-                conn = csp_connect(CSP_PRIO_NORM, other, PORT, 1000, CSP_O_NONE);
+                conn = csp_connect(CSP_PRIO_NORM, other, PORT, 1000, CSP_O_DEFAULT);
                 printf("Sending: %s\r\n", message);
                 if (!conn || !csp_send(conn, packet, 1000))
                     return -1;
