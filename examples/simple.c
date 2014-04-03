@@ -91,7 +91,7 @@ CSP_DEFINE_TASK(task_client) {
 
 		csp_sleep_ms(1000);
 
-		int result = csp_ping(MY_ADDRESS, 100, 100, CSP_O_NONE);
+		int result = csp_ping(MY_ADDRESS, 100, 100, CSP_O_DEFAULT);
 		printf("Ping result %d [ms]\r\n", result);
 
 		csp_sleep_ms(1000);
@@ -109,7 +109,7 @@ CSP_DEFINE_TASK(task_client) {
 		}
 
 		/* Connect to host HOST, port PORT with regular UDP-like protocol and 1000 ms timeout */
-		conn = csp_connect(CSP_PRIO_NORM, MY_ADDRESS, MY_PORT, 1000, CSP_O_NONE);
+		conn = csp_connect(CSP_PRIO_NORM, MY_ADDRESS, MY_PORT, 1000, CSP_O_DEFAULT);
 		if (conn == NULL) {
 			/* Connect failed */
 			printf("Connection failed\n");
