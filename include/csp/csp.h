@@ -168,6 +168,10 @@ typedef union {
 #define CSP_SO_CRC32PROHIB	0x0080				// Prohibit CRC32
 #define CSP_SO_CONN_LESS	0x0100				// Enable Connection Less mode
 
+#ifndef CSP_SO_DEFAULT
+#define CSP_SO_DEFAULT CSP_SO_NONE
+#endif
+
 /** CSP Connect options */
 #define CSP_O_NONE  		CSP_SO_NONE			// No connection options
 #define CSP_O_RDP  			CSP_SO_RDPREQ		// Enable RDP
@@ -178,6 +182,10 @@ typedef union {
 #define CSP_O_NOXTEA		CSP_SO_XTEAPROHIB	// Disable XTEA
 #define CSP_O_CRC32			CSP_SO_CRC32REQ		// Enable CRC32
 #define CSP_O_NOCRC32		CSP_SO_CRC32PROHIB	// Disable CRC32
+
+#ifndef CSP_O_DEFAULT
+#define CSP_O_DEFAULT CSP_O_NONE
+#endif
 
 #define CSP_PING_SUCCESS	0
 #define CSP_PING_TIMEOUT	-1
