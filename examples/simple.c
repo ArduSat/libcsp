@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 CSP_DEFINE_TASK(task_server) {
 
 	/* Create socket without any socket options */
-	csp_socket_t *sock = csp_socket(CSP_SO_NONE);
+	csp_socket_t *sock = csp_socket(CSP_SO_DEFAULT);
 
 	/* Bind all ports to socket */
 	csp_bind(sock, CSP_ANY);
