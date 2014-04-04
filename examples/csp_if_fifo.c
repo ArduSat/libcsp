@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
 
     /* Create socket and listen for incoming connections */
     if (type == TYPE_SERVER) {
-        sock = csp_socket(CSP_SO_NONE);
+        sock = csp_socket(CSP_SO_DEFAULT);
         csp_bind(sock, PORT);
         csp_listen(sock, 5);
     }

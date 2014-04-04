@@ -48,6 +48,7 @@ def options(ctx):
 	gr.add_option('--enable-hmac', action='store_true', help='Enable HMAC-SHA1 support')
 	gr.add_option('--enable-xtea', action='store_true', help='Enable XTEA support')
 	gr.add_option('--replace-xtea-with-aes256', action='store_true', help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
+	gr.add_option('--enable-aes256-precomputed-table', action='store_true', help='Precompute AES256 tables (faster, uses more memory)')
 	gr.add_option('--enable-bindings', action='store_true', help='Enable Python bindings')
 	gr.add_option('--enable-examples', action='store_true', help='Enable examples')
 
@@ -195,7 +196,8 @@ def configure(ctx):
 		ctx.env['FILES_CSP'].remove('src/crypto/csp_xtea.c')
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256.c')
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256_as_xtea.c')
-
+	ctx.define_cond('AES256_BACK_TO_TABLES', ctx.options.enable_aes256_precomputed_table)
+	
 	ctx.define_cond('CSP_DEBUG', not ctx.options.disable_debug)
 	ctx.define_cond('CSP_DISABLE_OUTPUT', ctx.options.disable_output)
 	ctx.define_cond('CSP_VERBOSE', not ctx.options.disable_verbose);

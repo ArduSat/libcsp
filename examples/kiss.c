@@ -14,7 +14,7 @@
 
 CSP_DEFINE_TASK(task_server) {
     int running = 1;
-    csp_socket_t *socket = csp_socket(CSP_SO_NONE);
+    csp_socket_t *socket = csp_socket(CSP_SO_DEFAULT);
     csp_conn_t *conn;
     csp_packet_t *packet;
     csp_packet_t *response;

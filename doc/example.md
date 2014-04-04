@@ -39,7 +39,7 @@ This example shows how to create a server task that listens for incoming connect
 ``` c
 void csp_task(void *parameters) {
     /* Create socket without any socket options */
-    csp_socket_t *sock = csp_socket(CSP_SO_NONE);
+    csp_socket_t *sock = csp_socket(CSP_SO_DEFAULT);
 
     /* Bind all ports to socket */
     csp_bind(sock, CSP_ANY);
