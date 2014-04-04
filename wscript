@@ -52,6 +52,9 @@ def options(ctx):
 	gr.add_option('--enable-bindings', action='store_true', help='Enable Python bindings')
 	gr.add_option('--enable-examples', action='store_true', help='Enable examples')
 
+	# Encryption options
+	gr.add_option('--mandate-encryption', action='store_true', help='Make XTEA encryption universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT) (except on AIS)')
+
 	# AES256 Options
 	gr.add_option('--replace-xtea-with-aes256', action='store_true', help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
 	gr.add_option('--disable-aes256-table', action='store_true', help="Don't precompute AES256 tables (slower, uses less memory)")
@@ -208,6 +211,10 @@ def configure(ctx):
 		else:
 			#TODO: Double quotes appear to be necessary to get single-quoted output.  ctx.define stripping?
 			ctx.define('AES256_ENCRYPTION_KEY', '""'+ctx.options.aes256_key+'""');
+
+	if ctx.options.mandate_encryption:
+		ctx.define('CSP_O_DEFAULT', 'CSP_O_XTEA')
+		ctx.define('CSP_SO_DEFAULT', 'CSP_SO_XTEAREQ')
 
 	ctx.define_cond('CSP_DEBUG', not ctx.options.disable_debug)
 	ctx.define_cond('CSP_DISABLE_OUTPUT', ctx.options.disable_output)
