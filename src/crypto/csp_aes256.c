@@ -48,8 +48,7 @@ typedef struct {
 #define AES256_BLOCKSIZE 16
 #define AES256_KEYLENGTH 32
 
-uint8_t csp_aes256_key[AES256_KEYLENGTH];
-char    key_initialized = false;
+char * csp_aes256_key = AES256_ENCRYPTION_KEY;
 
 // #define AES256_BACK_TO_TABLES
 #ifdef AES256_BACK_TO_TABLES
@@ -400,12 +399,6 @@ static inline void xor_bytes(uint8_t * dst, uint8_t * src, uint32_t len) {
  * @param iv Initialization vector
  */
 int csp_aes256_encrypt(uint8_t * plain, const uint32_t len, uint32_t iv[4]) {
-
-    if (!key_initialized) {
-        fprintf(stderr, "AES256 Encryption Key Unitialized: set with csp_aes256_set_key\n");
-        return CSP_ERR_INVAL;
-    }
-
     unsigned int i;
     uint32_t stream[4];
 
