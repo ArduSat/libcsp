@@ -209,12 +209,11 @@ def configure(ctx):
 		if not re.compile('^[^"]{32}$').match(ctx.options.aes256_key):
 			sys.exit('    ERROR: --aes256-key KEY: KEY must be 32-character string ([^"]{32})')
 		else:
-			#TODO: Double quotes appear to be necessary to get single-quoted output.  ctx.define stripping?
-			ctx.define('AES256_ENCRYPTION_KEY', '""'+ctx.options.aes256_key+'""');
+			ctx.define('AES256_ENCRYPTION_KEY', ctx.options.aes256_key, True);
 
 	if ctx.options.mandate_encryption:
-		ctx.define('CSP_O_DEFAULT', 'CSP_O_XTEA')
-		ctx.define('CSP_SO_DEFAULT', 'CSP_SO_XTEAREQ')
+		ctx.define('CSP_O_DEFAULT', 'CSP_O_XTEA', False)
+		ctx.define('CSP_SO_DEFAULT', 'CSP_SO_XTEAREQ', False)
 
 	ctx.define_cond('CSP_DEBUG', not ctx.options.disable_debug)
 	ctx.define_cond('CSP_DISABLE_OUTPUT', ctx.options.disable_output)
