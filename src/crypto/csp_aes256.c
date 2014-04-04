@@ -448,13 +448,14 @@ int csp_aes256_decrypt(uint8_t * cipher, const uint32_t len, uint32_t iv[4]) {
 }
 
 int csp_aes256_set_key(char * key, uint32_t keylen) {
-    if (keylen != AES256_KEYLENGTH) {
-        fprintf(stderr, "Invalid key length for csp_aes256_set_key: must be %d\n", AES256_KEYLENGTH);
-        return CSP_ERR_INVAL;
-    }
-    /* Copy key */
-    memcpy(csp_aes256_key, (uint8_t *)key, AES256_KEYLENGTH);
-    key_initialized = true;
+    fprintf(stderr, "ERROR: csp_aes256_set_key should not be called; key set at compilation\n");
+    //TODO: This isn't an elegant way to handle this.
+    //if (keylen != AES256_KEYLENGTH) {
+    //    fprintf(stderr, "Invalid key length for csp_aes256_set_key: must be %d\n", AES256_KEYLENGTH);
+    //    return CSP_ERR_INVAL;
+    //}
+    ///* Copy key */
+    //memcpy(csp_aes256_key, (uint8_t *)key, AES256_KEYLENGTH);
 
-    return CSP_ERR_NONE;
+    return CSP_ERR_INVAL;
 }
