@@ -20,6 +20,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 import os
+import re
+import sys
 
 APPNAME = 'libcsp'
 VERSION = '1.0.1'
@@ -47,10 +49,16 @@ def options(ctx):
 	gr.add_option('--enable-crc32', action='store_true', help='Enable CRC32 support')
 	gr.add_option('--enable-hmac', action='store_true', help='Enable HMAC-SHA1 support')
 	gr.add_option('--enable-xtea', action='store_true', help='Enable XTEA support')
-	gr.add_option('--replace-xtea-with-aes256', action='store_true', help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
-	gr.add_option('--enable-aes256-precomputed-table', action='store_true', help='Precompute AES256 tables (faster, uses more memory)')
 	gr.add_option('--enable-bindings', action='store_true', help='Enable Python bindings')
 	gr.add_option('--enable-examples', action='store_true', help='Enable examples')
+
+	# Encryption options
+	gr.add_option('--mandate-encryption', action='store_true', help='Make XTEA encryption universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT) (except on AIS)')
+
+	# AES256 Options
+	gr.add_option('--replace-xtea-with-aes256', action='store_true', help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
+	gr.add_option('--disable-aes256-table', action='store_true', help="Don't precompute AES256 tables (slower, uses less memory)")
+	gr.add_option('--aes256-key', metavar='KEY', help="Set AES256 encryption key (must be 32 bytes)")
 
 	# Interfaces
 	gr.add_option('--enable-if-i2c', action='store_true', help='Enable I2C interface')
@@ -196,8 +204,18 @@ def configure(ctx):
 		ctx.env['FILES_CSP'].remove('src/crypto/csp_xtea.c')
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256.c')
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256_as_xtea.c')
-	ctx.define_cond('AES256_BACK_TO_TABLES', ctx.options.enable_aes256_precomputed_table)
-	
+	ctx.define_cond('AES256_BACK_TO_TABLES', not ctx.options.disable_aes256_table)
+	if ctx.options.aes256_key:
+		if not re.compile('^[^"]{32}$').match(ctx.options.aes256_key):
+			sys.exit('    ERROR: --aes256-key KEY: KEY must be 32-character string ([^"]{32})')
+		else:
+			#TODO: Double quotes appear to be necessary to get single-quoted output.  ctx.define stripping?
+			ctx.define('AES256_ENCRYPTION_KEY', '""'+ctx.options.aes256_key+'""');
+
+	if ctx.options.mandate_encryption:
+		ctx.define('CSP_O_DEFAULT', 'CSP_O_XTEA')
+		ctx.define('CSP_SO_DEFAULT', 'CSP_SO_XTEAREQ')
+
 	ctx.define_cond('CSP_DEBUG', not ctx.options.disable_debug)
 	ctx.define_cond('CSP_DISABLE_OUTPUT', ctx.options.disable_output)
 	ctx.define_cond('CSP_VERBOSE', not ctx.options.disable_verbose);
