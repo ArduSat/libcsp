@@ -55,6 +55,9 @@ static uint32_t csp_rdp_packet_timeout = 1000;
 static uint32_t csp_rdp_delayed_acks = 1;
 static uint32_t csp_rdp_ack_timeout = 1000 / 4;
 static uint32_t csp_rdp_ack_delay_count = 4 / 2;
+static uint8_t  csp_rdp_wait_for_ack = 1;
+
+
 
 /* Used for queue calls */
 static CSP_BASE_TYPE pdTrue = 1;
@@ -406,9 +409,16 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 			/* If not found, put back on tx queue */
 			csp_queue_enqueue(conn->rdp.tx_queue, &packet, 0);
 		} else {
+
 			/* Found, free */
 			csp_log_protocol("TX Element %u freed\r\n", csp_ntoh16(header->seq_nr));
 			csp_buffer_free(packet);
+
+            // notify the waiting task that its message was successfully ack'ed
+			if (conn->rdp.wait_for_ack) {
+                csp_bin_sem_post(&conn->rdp.tx_wait);
+            }
+
 		}
 
 	}
@@ -444,12 +454,18 @@ void csp_rdp_flush_all(csp_conn_t * conn) {
 	rdp_packet_t * packet;
 
 	/* Empty TX queue */
+
 	while (csp_queue_dequeue_isr(conn->rdp.tx_queue, &packet, &pdTrue) == CSP_QUEUE_OK) {
 		if (packet != NULL) {
 			csp_log_protocol("Flush TX Element, time %u, seq %u\r\n", packet->timestamp, csp_ntoh16(csp_rdp_header_ref((csp_packet_t *) packet)->seq_nr));
 			csp_buffer_free(packet);
 		}
 	}
+
+    // if a task was waiting for this to be sent, wake it up.
+    if (conn->rdp.wait_for_ack) {
+        csp_bin_sem_post(&conn->rdp.tx_wait);
+    }
 
 	/* Empty RX queue */
 	while (csp_queue_dequeue_isr(conn->rdp.rx_queue, &packet, &pdTrue) == CSP_QUEUE_OK) {
@@ -534,9 +550,16 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 		rdp_header_t * header = csp_rdp_header_ref((csp_packet_t *) packet);
 
 		/* If acked, do not retransmit */
+
 		if (csp_rdp_seq_before(csp_ntoh16(header->seq_nr), conn->rdp.snd_una)) {
 			csp_log_protocol("TX Element Free, time %u, seq %u, una %u\r\n", packet->timestamp, csp_ntoh16(header->seq_nr), conn->rdp.snd_una);
 			csp_buffer_free(packet);
+
+            // notify the waiting task that its message was successfully ack'ed
+			if (conn->rdp.wait_for_ack) {
+                csp_bin_sem_post(&conn->rdp.tx_wait);
+            }
+
 			continue;
 		}
 
@@ -880,6 +903,7 @@ int csp_rdp_connect(csp_conn_t * conn, uint32_t timeout) {
 	conn->rdp.ack_timeout 	  = csp_rdp_ack_timeout;
 	conn->rdp.ack_delay_count = csp_rdp_ack_delay_count;
 	conn->rdp.ack_timestamp   = csp_get_ms();
+    conn->rdp.wait_for_ack    = csp_rdp_wait_for_ack;
 
 retry:
 	csp_log_protocol("RDP: Active connect, conn state %u\r\n", conn->rdp.state);
@@ -987,6 +1011,15 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 				packet->length, packet->length - sizeof(rdp_header_t));
 
 	conn->rdp.snd_nxt++;
+
+    // wait for actual acknowledgement as a means for returning.
+    if (conn->rdp.wait_for_ack) {
+        if ((csp_bin_sem_wait(&conn->rdp.tx_wait, timeout)) != CSP_SEMAPHORE_OK) {
+			csp_log_error("Timeout during waiting for ack\r\n");
+			return CSP_ERR_TIMEDOUT;
+        }
+    }
+
 	return CSP_ERR_NONE;
 
 }
