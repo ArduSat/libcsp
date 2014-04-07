@@ -55,7 +55,7 @@ static uint32_t csp_rdp_packet_timeout = 1000;
 static uint32_t csp_rdp_delayed_acks = 1;
 static uint32_t csp_rdp_ack_timeout = 1000 / 4;
 static uint32_t csp_rdp_ack_delay_count = 4 / 2;
-static uint8_t  csp_rdp_wait_for_ack = 1;
+static uint8_t  csp_rdp_wait_for_ack = 0;
 
 
 
@@ -1130,5 +1130,14 @@ void csp_rdp_conn_print(csp_conn_t * conn) {
 
 }
 #endif
+
+void csp_rdp_enable_tx_wait_for_ack(csp_conn_t * conn) {
+    conn->rdp.wait_for_ack = true;
+}
+
+void csp_rdp_disable_tx_wait_for_ack(csp_conn_t * conn) {
+    conn->rdp.wait_for_ack = false;
+}
+
 
 #endif

@@ -38,6 +38,8 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout);
 int csp_rdp_check_ack(csp_conn_t * conn);
 void csp_rdp_check_timeouts(csp_conn_t * conn);
 void csp_rdp_flush_all(csp_conn_t * conn);
+void csp_rdp_enable_tx_wait_for_ack(csp_conn_t * conn);
+void csp_rdp_disable_tx_wait_for_ack(csp_conn_t * conn);
 
 #ifdef __cplusplus
 } /* extern "C" */
