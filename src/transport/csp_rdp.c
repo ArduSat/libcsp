@@ -715,7 +715,6 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 
 			/* Wake TX task */
 			csp_bin_sem_post(&conn->rdp.tx_wait);
-            printf("sem POST! RDP_SYN_SENT\r\n");
 
 			goto discard_open;
 		}
@@ -832,7 +831,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		/* Only ACK the message if there is room for a full window in the RX buffer.
 		 * Unacknowledged segments are ACKed by csp_rdp_check_timeouts when the buffer is
 		 * no longer full. */
-		if (rx_queue_size + conn->rdp.window_size <= CSP_RX_QUEUE_LENGTH) {
+		if ((conn->idout.flags & CSP_FRDPSINGLE) || conn->rx_queue_size + conn->rdp.window_size <= CSP_RX_QUEUE_LENGTH) {
 			if (csp_rdp_should_ack(conn))
 				csp_rdp_send_cmp(conn, NULL, RDP_ACK, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
 		} else {
