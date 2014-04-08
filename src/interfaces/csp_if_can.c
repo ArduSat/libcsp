@@ -472,7 +472,6 @@ static int csp_can_process_frame(can_frame_t *frame) {
 				return CSP_ERR_NOMEM;
 			}
         } else {
-            csp_id_t* cspid =  (csp_id_t*) &frame->data;
 			csp_log_warn("Out of order MORE frame received for can id 0x%"PRIx32"; remain is %u\r\n",
                          (uint32_t)id, CFP_REMAIN(id));
 			csp_if_can.frame++;
