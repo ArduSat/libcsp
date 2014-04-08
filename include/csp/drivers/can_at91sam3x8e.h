@@ -30,7 +30,10 @@ extern "C" {
 #endif
 
     int can_reset (int8_t index);
-    uint8_t can_get_reset_cnt (void);
+    void can_get_various_cnts (uint8_t *reset_cnt,
+                               uint8_t *queue_full_cnt,
+                               uint8_t *read_give_up_cnt,
+                               uint8_t *mbox_overwritten_cnt);
     uint8_t can_get_active_idx (void);
     uint8_t can_get_num_free_tx_mboxes (uint8_t idx);
 

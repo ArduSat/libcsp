@@ -72,7 +72,6 @@ typedef struct {
 	csp_bin_sem_handle_t tx_wait;
 	csp_queue_handle_t tx_queue;
 	csp_queue_handle_t rx_queue;
-    uint8_t wait_for_ack;    // set true if you want to serialize transmits
 } csp_rdp_t;
 
 /** @brief Connection struct */
