@@ -472,7 +472,6 @@ static int csp_can_process_frame(can_frame_t *frame) {
 				return CSP_ERR_NOMEM;
 			}
         } else {
-            csp_id_t* cspid =  (csp_id_t*) &frame->data;
 			csp_log_warn("Out of order MORE frame received for can id 0x%"PRIx32"; remain is %u\r\n",
                          (uint32_t)id, CFP_REMAIN(id));
 			csp_if_can.frame++;
@@ -584,6 +583,7 @@ CSP_DEFINE_TASK(csp_can_rx_task) {
 
 	int ret;
 	can_frame_t frame;
+
 	while (1) {
 		ret = csp_queue_dequeue(can_rx_queue, &frame, 1000);
 		if (ret != CSP_QUEUE_OK) {
@@ -709,7 +709,7 @@ int csp_can_init(uint8_t mode, struct csp_can_config *conf) {
 		return CSP_ERR_NOMEM;
 	}
 
-	ret = csp_thread_create(csp_can_rx_task, (signed char *) "CAN", 4000/sizeof(int), NULL, 3, &can_rx_task);
+	ret = csp_thread_create(csp_can_rx_task, (signed char *) "CANRX",2048, NULL, 3, &can_rx_task);
 	if (ret != 0) {
 		csp_log_error("Failed to init CAN RX task\r\n");
 		return CSP_ERR_NOMEM;

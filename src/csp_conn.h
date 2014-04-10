@@ -1,7 +1,7 @@
 /*
 Cubesat Space Protocol - A small network-layer protocol designed for Cubesats
 Copyright (C) 2012 GomSpace ApS (http://www.gomspace.com)
-Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk) 
+Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk)
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -63,8 +63,8 @@ typedef struct {
 	uint16_t rcv_irs; 					/**< The initial receive sequence number */
 	uint16_t rcv_lsa; 					/**< The last sequence number acknowledged by the receiver */
 	uint32_t window_size;
-	uint32_t conn_timeout;
-	uint32_t packet_timeout;
+	uint32_t conn_timeout;    // total timeout
+	uint32_t packet_timeout;  // timeout before we retransmit
 	uint32_t delayed_acks;
 	uint32_t ack_timeout;
 	uint32_t ack_delay_count;

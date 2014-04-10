@@ -56,8 +56,7 @@
 #define CAN_RX_MBOX_BEGIN_IDX 4
 #define CAN_MBOXES	8
 #define CAN_RX_TCR_MASK (CAN_TCR_MB4 | CAN_TCR_MB5 | CAN_TCR_MB6 | CAN_TCR_MB7)
-#define CAN_RX_IER_MASK (0x00000000 | CAN_IER_MB4 | CAN_IER_MB5 |  \
-												 CAN_IER_MB6 | CAN_IER_MB7)
+#define CAN_RX_IER_MASK (0x00000000 | CAN_IER_MB4 | CAN_IER_MB5 | CAN_IER_MB6 | CAN_IER_MB7)
 
 #define is_tx_mailbox(m)	(m < CAN_RX_MBOX_BEGIN_IDX)
 #define is_rx_mailbox(m)	(!is_tx_mailbox(m))
@@ -73,11 +72,17 @@ uint8_t CAN_IDS[] = {ID_CAN0,ID_CAN1};
 Can *p_cans[] = {CAN0,CAN1};
 IRQn_Type IRQ_numbers[] = {CAN0_IRQn,CAN1_IRQn};
 char* can_ifcs[] = {"CAN0","CAN1"};
+
 // callback functions
 can_tx_callback_t txcbs[] = {NULL,NULL};
 can_rx_callback_t rxcbs[] = {NULL,NULL};
 uint8_t can_reset_count[] = {0,0};
 uint8_t can_in_middle_of_reset = false;
+uint16_t mbox_overwritten_cnt = 0;
+uint16_t read_give_up_cnt = 0;
+uint16_t queue_full_cnt = 0;
+uint16_t isr_cnt = 0;
+
 // Indices for the above arrays
 #define CAN0_INDEX 0
 #define CAN1_INDEX 1
@@ -285,13 +290,22 @@ int can_reset_entry_point (int8_t index) {
 
 
 /**
- * can_get_reset_cnt
- * returns the reset count of the current device
- * @return count
+ * can_get_various_cnts
+ * returns different statistic counts of the current device
+ * @param pointers to the counts
  */
-uint8_t can_get_reset_cnt (void) {
-	return can_reset_count[curr_idx];
+void can_get_various_cnts (uint8_t *reset_cnt_store,
+                           uint16_t *queue_full_cnt_store,
+                           uint16_t *read_give_up_cnt_store,
+                           uint16_t *mbox_overwritten_cnt_store,
+                           uint16_t *isr_cnt_store) {
+	*reset_cnt_store = can_reset_count[curr_idx];
+    *queue_full_cnt_store = queue_full_cnt;
+    *read_give_up_cnt_store = read_give_up_cnt;
+    *mbox_overwritten_cnt_store = mbox_overwritten_cnt;
+    *isr_cnt_store = isr_cnt;
 }
+
 
 /**
  * can_get_active_idx
@@ -449,7 +463,7 @@ void CAN1_Handler (void) {can_isr(CAN1_INDEX);}
  */
 void can_isr (uint8_t dev) {
 
-	uint32_t dev_status = 0x0, mb_status = 0x0;
+	uint32_t dev_status = 0x0, mb_status = 0x0, read_status = 0x0;
 	uint8_t m;
 	int32_t rc = 0;
 	portBASE_TYPE task_woken = pdFALSE;
@@ -493,18 +507,19 @@ void can_isr (uint8_t dev) {
 					// attempt to read the mailbox
 					rc = 0;
 
-					while (can_mailbox_read(p_cans[curr_idx],
-											&mbox_configs[curr_idx][m])
-						   != CAN_MAILBOX_TRANSFER_OK)
+					while ((read_status = can_mailbox_read(p_cans[curr_idx],
+                                                           &mbox_configs[curr_idx][m]))
+						   == CAN_MAILBOX_NOT_READY)
 						{
-
 							if (++rc == READ_TRIES) {
-								printf("can_mailbox_read call returned "
-									   "unsuccessfully after %d attempts.\r\n",
-									   READ_TRIES);
+                                read_give_up_cnt++;
 								return;
 							}
 						}
+
+                    if (read_status == CAN_MAILBOX_RX_OVER) {
+                        mbox_overwritten_cnt++;
+                    }
 
 					frame.dlc = mbox_configs[curr_idx][m].uc_length;
 
@@ -538,8 +553,10 @@ void can_isr (uint8_t dev) {
 					frame.id = p_cans[curr_idx]->CAN_MB[m].CAN_MID;
 
 					// Call RX Callback
-					if (rxcbs[curr_idx] != NULL)
-						(rxcbs[curr_idx])(&frame, &task_woken);
+					if (rxcbs[curr_idx] != NULL &&
+                        ((rxcbs[curr_idx])(&frame, &task_woken) == CSP_ERR_NOMEM)) {
+                        queue_full_cnt++;
+                    }
 
 				} else if (is_tx_mailbox(m)
 						   && mbox_tx_statuses[curr_idx][m]
@@ -566,4 +583,5 @@ void can_isr (uint8_t dev) {
 			}
 		} // for
 	} while (events_occurred); // while
+    isr_cnt++;
 }
