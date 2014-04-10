@@ -281,6 +281,7 @@ int can_reset_entry_point (int8_t index) {
 
 	// allow interrupts and initial receipt for RX mailboxes
 	can_enable_interrupt(p_cans[curr_idx],CAN_RX_IER_MASK);
+	NVIC_SetPriority(IRQ_numbers[curr_idx], 15);
 	NVIC_EnableIRQ(IRQ_numbers[curr_idx]); // Enable CAN device interrupts
 	can_global_send_transfer_cmd(p_cans[curr_idx],CAN_RX_TCR_MASK);
 
@@ -348,6 +349,7 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 							CSP_BASE_TYPE * task_woken) {
 
 	int32_t i, m = -1, wc = 0;
+	int result = -1;
 	uint32_t temp[2];
 	uint32_t can_status;
 	uint32_t can_mr;
@@ -389,14 +391,9 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 		}
 	}
 
-	// Enable interrupts
-	if (task_woken == NULL) {
-		portEXIT_CRITICAL();
-	}
-
 	// Return if no available mailbox was found
 	if (m < 0) {
-		return -1;
+		goto done;
 	}
 
 	mbox_configs[curr_idx][m].uc_length = dlc;
@@ -433,14 +430,22 @@ int can_send (can_id_t id, uint8_t data[], uint8_t dlc,
 		if (++wc == WRITE_TRIES) {
 			csp_log_warn("can_mailbox_write call returned unsuccessfully after %d attempts.\r\n",
 									 WRITE_TRIES);
-			return -1;
+			goto done;
 		}
 	}
 
 	can_global_send_transfer_cmd(p_cans[curr_idx],0x1u<<m); // initiate transfer
 	can_enable_interrupt(p_cans[curr_idx],1<<m); // enable interrupts
 
-	return 0;
+	result = 0;         // success!
+
+done:
+        // Enable interrupts
+        if (task_woken == NULL) {
+                portEXIT_CRITICAL();
+        }
+
+	return result;
 }
 
 
