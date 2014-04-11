@@ -1,7 +1,7 @@
 /*
 Cubesat Space Protocol - A small network-layer protocol designed for Cubesats
 Copyright (C) 2012 GomSpace ApS (http://www.gomspace.com)
-Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk) 
+Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk)
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -48,7 +48,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 /** Static local variables */
 unsigned char my_address;
 
-/* Hostname and model */ 
+/* Hostname and model */
 static char * csp_hostname = NULL;
 static char * csp_model = NULL;
 
@@ -96,7 +96,7 @@ int csp_init(unsigned char address) {
 }
 
 csp_socket_t * csp_socket(uint32_t opts) {
-	
+
 	/* Validate socket options */
 #ifndef CSP_USE_RDP
 	if (opts & CSP_SO_RDPREQ) {
@@ -116,16 +116,16 @@ csp_socket_t * csp_socket(uint32_t opts) {
 	if (opts & CSP_SO_HMACREQ) {
 		csp_log_error("Attempt to create socket that requires HMAC, but CSP was compiled without HMAC support\r\n");
 		return NULL;
-	} 
+	}
 #endif
 
 #ifndef CSP_USE_CRC32
 	if (opts & CSP_SO_CRC32REQ) {
 		csp_log_error("Attempt to create socket that requires CRC32, but CSP was compiled without CRC32 support\r\n");
 		return NULL;
-	} 
+	}
 #endif
-	
+
 	/* Drop packet if reserved flags are set */
 	if (opts & ~(CSP_SO_RDPREQ | CSP_SO_XTEAREQ | CSP_SO_HMACREQ | CSP_SO_CRC32REQ | CSP_SO_CONN_LESS)) {
 		csp_log_error("Invalid socket option\r\n");
@@ -357,8 +357,10 @@ int csp_transaction_persistent(csp_conn_t * conn, uint32_t timeout, void * outbu
 	}
 
 	/* If no reply is expected, return now */
-	if (inlen == 0)
+	if (inlen == 0) {
+        csp_buffer_free(packet);
 		return 1;
+    }
 
 	packet = csp_read(conn, timeout);
 	if (packet == NULL)
@@ -447,7 +449,7 @@ int csp_sendto(uint8_t prio, uint8_t dest, uint8_t dport, uint8_t src_port, uint
 
 	if (csp_send_direct(packet->id, packet, timeout) != CSP_ERR_NONE)
 		return CSP_ERR_NOTSUP;
-	
+
 	return CSP_ERR_NONE;
 
 }
