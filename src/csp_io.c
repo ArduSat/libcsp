@@ -358,7 +358,6 @@ int csp_transaction_persistent(csp_conn_t * conn, uint32_t timeout, void * outbu
 
 	/* If no reply is expected, return now */
 	if (inlen == 0) {
-        csp_buffer_free(packet);
 		return 1;
     }
 
