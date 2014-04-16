@@ -42,6 +42,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../csp_io.h"
 #include "csp_transport.h"
 
+void csp_rdp_stats(csp_conn_t * conn); // Forward declaration
+
 #ifdef CSP_USE_RDP
 
 #define RDP_SYN	0x01
@@ -177,6 +179,18 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 	header->eak = (flags & RDP_EAK) ? 1 : 0;
 	header->syn = (flags & RDP_SYN) ? 1 : 0;
 	header->rst = (flags & RDP_RST) ? 1 : 0;
+
+    printf("%s [%"PRIu32"]\tSEQ:%u ACK:(%u)\t%s%s%s%s\r\n",
+           rdpdbg_initiator?"RX<----   ":"  ---->RX ",
+           csp_get_ms() - rdpdbg_timebase_ms,
+           csp_hton16(seq_nr),
+           csp_hton16(ack_nr),
+           flags & RDP_SYN?"SYN ":"",
+           flags & RDP_ACK?"ACK ":"",
+           flags & RDP_EAK?"EACK ":"",
+           flags & RDP_RST?"RST ":""
+           );
+    csp_rdp_stats(conn);
 
 	/* Send copy to tx_queue, before sending packet to IF */
 	if (flags & RDP_SYN) {
@@ -591,17 +605,6 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			conn->rdp.state, rx_header->syn, rx_header->ack, rx_header->eak,
 			rx_header->rst, rx_header->seq_nr, rx_header->ack_nr,
 			packet->length, packet->length - sizeof(rdp_header_t));
-
-    printf("%s [%"PRIu32"]\tSEQ:%u ACK:(%u)\t%s%s%s%s\r\n",
-           rdpdbg_initiator?"RX<----   ":"  ---->RX ",
-           csp_get_ms() - rdpdbg_timebase_ms,
-           rx_header->seq_nr,
-           rx_header->ack_nr,
-           rx_header->syn?"SYN ":"",
-           rx_header->ack?"ACK ":"",
-           rx_header->eak?"EACK ":"",
-           rx_header->rst?"RST ":""
-           );
 
 	/* If a RESET was received. */
 	if (rx_header->rst) {
@@ -1018,6 +1021,7 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
            tx_header->eak?"EACK ":"",
            tx_header->rst?"RST ":""
                      );
+    csp_rdp_stats(conn);
 
 	conn->rdp.snd_nxt++;
 	return CSP_ERR_NONE;
@@ -1130,5 +1134,35 @@ void csp_rdp_conn_print(csp_conn_t * conn) {
 
 }
 #endif
+
+
+void csp_rdp_stats(csp_conn_t * conn) {
+    const char* stt;
+
+    switch(conn->rdp.state) {
+        case RDP_CLOSE_WAIT:
+            stt = "RDP_CLOSE_WAIT";
+            break;
+        case RDP_CLOSED:
+            stt = "RDP_CLOSED";
+            break;
+        case RDP_SYN_SENT:
+            stt = "RDP_SYN_SENT";
+            break;
+        case RDP_SYN_RCVD:
+            stt = "RDP_SYN_RCVD";
+            break;
+        default:
+            stt = "???";
+            break;
+    }
+	printf("    RDP: State = %s\ttx_queue: %u of %u\trx_queue: %u of %u\r\r\n",
+			stt,
+           csp_queue_size(conn->rdp.tx_queue), CSP_RDP_MAX_WINDOW,
+           csp_queue_size(conn->rdp.rx_queue), CSP_RDP_MAX_WINDOW*2);
+    printf("    RDP: oldest unacknowledged sent: %u \t| last correct rec'd: %u \t| last acked rec'd: %u\r\n",
+           conn->rdp.snd_una, conn->rdp.rcv_cur, conn->rdp.rcv_lsa);
+
+}
 
 #endif
