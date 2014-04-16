@@ -183,7 +183,8 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 		rdp_packet_t * rdp_packet = csp_buffer_clone(packet);
 		if (rdp_packet == NULL) return CSP_ERR_NOMEM;
 		rdp_packet->timestamp = csp_get_ms();
-		if (csp_queue_enqueue(conn->rdp.tx_queue, &rdp_packet, 0) != CSP_QUEUE_OK)
+		if (csp_queue_enqueue(conn->rdp.tx_queue, &rdp_packet, 0) != CSP_QUEUE_OK) {
+            csp_log_error("rdp tx queue has a problem enqueuing to it!!\r\n");//TEMP
 			csp_buffer_free(rdp_packet);
 	}
 
@@ -407,7 +408,10 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 
 		if (match == 0) {
 			/* If not found, put back on tx queue */
-			csp_queue_enqueue(conn->rdp.tx_queue, &packet, 0);
+			if (csp_queue_enqueue(conn->rdp.tx_queue, &packet, 0) != CSP_QUEUE_OK) {
+                csp_log_error("rdp tx queue has a problem enqueuing to it!!\r\n");//TEMP
+            }
+
 		} else {
 
 			/* Found, free */
@@ -581,8 +585,9 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 		}
 
 		/* Requeue the TX element */
-		csp_queue_enqueue_isr(conn->rdp.tx_queue, &packet, &pdTrue);
-
+	    if (csp_queue_enqueue_isr(conn->rdp.tx_queue, &packet, &pdTrue) != CSP_QUEUE_OK)  {
+            csp_log_error("ISR rdp tx queue has a problem enqueuing to it!!\r\n");//TEMP!!!!!!!!
+        }
 	}
 
 	/**
