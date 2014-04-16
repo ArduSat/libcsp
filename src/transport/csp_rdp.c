@@ -56,6 +56,8 @@ static uint32_t csp_rdp_delayed_acks = 1;
 static uint32_t csp_rdp_ack_timeout = 1000 / 4;
 static uint32_t csp_rdp_ack_delay_count = 4 / 2;
 
+static uint32_t rdpdbg_timebase_ms;
+static uint8_t rdpdbg_initiator;
 
 /* Used for queue calls */
 static CSP_BASE_TYPE pdTrue = 1;
@@ -610,7 +612,21 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			"rst %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
 			conn->rdp.state, rx_header->syn, rx_header->ack, rx_header->eak,
 			rx_header->rst, rx_header->seq_nr, rx_header->ack_nr,
-			packet->length, packet->length - sizeof(rdp_header_t));
+                     packet->length, packet->length - sizeof(rdp_header_t));
+
+    printf("%s [%"PRIu32"]\tSEQ:%u ACK:(%u)\t%s%s%s\r\n",
+           rdpdbg_initiator?"RX<----   ":"  ---->RX ",
+           csp_get_ms() - rdpdbg_timebase_ms,
+           rx_header->seq_nr,
+           rx_header->ack_nr,
+           rx_header->syn?"SYN ":"",
+           rx_header->eak?"EACK ":"",
+           rx_header->rst?"RST ":""
+           );
+
+    // <timestamp in ms> <RX or TX> SEQ: ##### (ACK: #####) <flags>
+
+
 
 	/* If a RESET was received. */
 	if (rx_header->rst) {
@@ -660,6 +676,10 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 
 		/* Setup TX seq. */
 		srand(csp_get_ms());
+
+        rdpdbg_timebase_ms = csp_get_ms()-150;
+        rdpdbg_initiator = false;
+
 		conn->rdp.snd_iss = (uint16_t)rand();
 		conn->rdp.snd_nxt = conn->rdp.snd_iss + 1;
 		conn->rdp.snd_una = conn->rdp.snd_iss;
@@ -913,6 +933,10 @@ retry:
 
 	/* Randomize ISS */
 	srand(csp_get_ms());
+
+    rdpdbg_timebase_ms = csp_get_ms();
+    rdpdbg_initiator = true;
+
 	conn->rdp.snd_iss = (uint16_t)rand();
 
 	conn->rdp.snd_nxt = conn->rdp.snd_iss + 1;
@@ -1007,6 +1031,18 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 				conn->rdp.state, tx_header->syn, tx_header->ack, tx_header->eak,
 				tx_header->rst, csp_ntoh16(tx_header->seq_nr), csp_ntoh16(tx_header->ack_nr),
 				packet->length, packet->length - sizeof(rdp_header_t));
+
+    printf("%s [%"PRIu32"]\tSEQ:%u ACK:(%u)\t%s%s%s\r\n",
+           rdpdbg_initiator?"TX---->   ":"  <----TX ",
+           csp_get_ms() - rdpdbg_timebase_ms,
+           csp_ntoh16(tx_header->seq_nr),
+           csp_ntoh16(tx_header->ack_nr),
+           tx_header->syn?"SYN ":"",
+           tx_header->eak?"EACK ":"",
+           tx_header->rst?"RST ":""
+                     );
+
+
 
 	conn->rdp.snd_nxt++;
 
