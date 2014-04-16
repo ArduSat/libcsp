@@ -1,7 +1,7 @@
 /*
 Cubesat Space Protocol - A small network-layer protocol designed for Cubesats
 Copyright (C) 2012 GomSpace ApS (http://www.gomspace.com)
-Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk)
+Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk) 
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -167,7 +167,7 @@ csp_conn_t * csp_conn_find(uint32_t id, uint32_t mask) {
 		if ((conn->state != CONN_CLOSED) && (conn->type == CONN_CLIENT) && (conn->idin.ext & mask) == (id & mask))
 			return conn;
 	}
-
+	
 	return NULL;
 
 }
@@ -316,10 +316,6 @@ csp_conn_t * csp_connect(uint8_t prio, uint8_t dest, uint8_t dport, uint32_t tim
 #ifdef CSP_USE_RDP
 		incoming_id.flags |= CSP_FRDP;
 		outgoing_id.flags |= CSP_FRDP;
-        if (opts & CSP_O_RDPSINGLE) {
-            incoming_id.flags |= CSP_FRDPSINGLE;
-            outgoing_id.flags |= CSP_FRDPSINGLE;
-        }
 #else
 		csp_log_error("Attempt to create RDP connection, but CSP was compiled without RDP support\r\n");
 		return NULL;
@@ -355,7 +351,7 @@ csp_conn_t * csp_connect(uint8_t prio, uint8_t dest, uint8_t dport, uint32_t tim
 		return NULL;
 #endif
 	}
-
+	
 	/* Find an unused ephemeral port */
 	csp_conn_t * conn;
 
@@ -370,7 +366,7 @@ csp_conn_t * csp_connect(uint8_t prio, uint8_t dest, uint8_t dport, uint32_t tim
 
 		outgoing_id.sport = sport;
 		incoming_id.dport = sport;
-
+		
 		/* Match on destination port of _incoming_ identifier */
 		conn = csp_conn_find(incoming_id.ext, CSP_ID_DPORT_MASK);
 

@@ -1,7 +1,7 @@
 /*
 Cubesat Space Protocol - A small network-layer protocol designed for Cubesats
 Copyright (C) 2012 Gomspace ApS (http://www.gomspace.com)
-Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk)
+Copyright (C) 2012 AAUSAT3 Project (http://aausat3.space.aau.dk) 
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -155,7 +155,6 @@ typedef union {
 #define CSP_FXTEA 			0x04 				// Use XTEA encryption
 #define CSP_FRDP			0x02 				// Use RDP protocol
 #define CSP_FCRC32 			0x01 				// Use CRC32 checksum
-#define CSP_FRDPSINGLE      0x80                // Use RDP single protocol
 
 /** CSP Socket options */
 #define CSP_SO_NONE 		0x0000				// No socket options
@@ -168,7 +167,6 @@ typedef union {
 #define CSP_SO_CRC32REQ		0x0040				// Require CRC32
 #define CSP_SO_CRC32PROHIB	0x0080				// Prohibit CRC32
 #define CSP_SO_CONN_LESS	0x0100				// Enable Connection Less mode
-#define CSP_SO_RDPSINGLE    0x8000              // Add on flag to denote RDP single
 
 #ifndef CSP_SO_DEFAULT
 #define CSP_SO_DEFAULT CSP_SO_NONE
@@ -184,7 +182,6 @@ typedef union {
 #define CSP_O_NOXTEA		CSP_SO_XTEAPROHIB	// Disable XTEA
 #define CSP_O_CRC32			CSP_SO_CRC32REQ		// Enable CRC32
 #define CSP_O_NOCRC32		CSP_SO_CRC32PROHIB	// Disable CRC32
-#define CSP_O_RDPSINGLE     CSP_SO_RDPSINGLE    // Add on flag to denote RDP single
 
 #ifndef CSP_O_DEFAULT
 #define CSP_O_DEFAULT CSP_O_NONE
@@ -204,7 +201,7 @@ typedef union {
 /**
  * CSP PACKET STRUCTURE
  * Note: This structure is constructed to fit
- * with all interface frame types in order to
+ * with all interface frame types in order to 
  * have buffer reuse
  */
 typedef struct __attribute__((__packed__)) {

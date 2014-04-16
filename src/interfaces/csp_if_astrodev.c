@@ -20,7 +20,7 @@
 
 // To provide information to beacon for some of its algorithms.
 // Note: this gets reset externally.
-csp_id_t latest_csp_transfer_id[NUM_ASTRODEV_MODULES] = {{0x0},{0x0}};
+csp_id_t latest_csp_transfer_id[NUM_ASTRODEV_MODULES] = {0x0,0x0};
 
 static int csp_astrodev_tx (csp_iface_t *interface,
                             csp_packet_t *packet, uint32_t timeout) {
