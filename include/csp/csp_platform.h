@@ -28,7 +28,26 @@ extern "C" {
 #include <stdint.h>
 
 /* Set OS */
-#if defined(CSP_POSIX) || defined(CSP_WINDOWS) || defined(CSP_MACOSX)
+#if defined(CSP_POSIX)
+	// On Linux, we can use a recursive mutex to support recursive
+	// critical sections.  [mconst, 2014/4/17]
+	#include <pthread.h>
+	#define CSP_BASE_TYPE int
+	#define CSP_MAX_DELAY (UINT32_MAX)
+	#define CSP_INFINITY (UINT32_MAX)
+	#define CSP_DEFINE_CRITICAL(lock) static pthread_mutex_t lock
+	#define CSP_INIT_CRITICAL(lock) ({ \
+	    pthread_mutexattr_t attr; \
+	    pthread_mutexattr_init(&attr); \
+	    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP); \
+	    pthread_mutex_init(&lock, &attr); \
+	    CSP_ERR_NONE; })
+	#define CSP_ENTER_CRITICAL(lock) pthread_mutex_lock(&lock)
+	#define CSP_EXIT_CRITICAL(lock) pthread_mutex_unlock(&lock)
+#elif defined(CSP_WINDOWS) || defined(CSP_MACOSX)
+	// This is the original GomSpace implementation.  It deadlocks
+	// whenever the CSP code enters a critical section recursively.
+	// [mconst, 2014/4/17]
 	#define CSP_BASE_TYPE int
 	#define CSP_MAX_DELAY (UINT32_MAX)
 	#define CSP_INFINITY (UINT32_MAX)
