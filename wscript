@@ -53,12 +53,12 @@ def options(ctx):
 	gr.add_option('--enable-examples', action='store_true', help='Enable examples')
 
 	# Encryption options
-	gr.add_option('--mandate-encryption', action='store_true', help='Make XTEA encryption universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT) (except on AIS)')
+	gr.add_option('--mandate-encryption', action='store_true', default=True, help='Make XTEA encryption universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT) (except on AIS)')
 
 	# AES256 Options
-	gr.add_option('--replace-xtea-with-aes256', action='store_true', help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
+	gr.add_option('--replace-xtea-with-aes256', action='store_true', default=True, help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
 	gr.add_option('--disable-aes256-table', action='store_true', help="Don't precompute AES256 tables (slower, uses less memory)")
-	gr.add_option('--aes256-key', metavar='KEY', help="Set AES256 encryption key (must be 32 bytes)")
+	gr.add_option('--aes256-key', metavar='KEY', default='01234567890123456789012345678901', help="Set AES256 encryption key (must be 32 bytes)")
 
 	# Interfaces
 	gr.add_option('--enable-if-i2c', action='store_true', help='Enable I2C interface')
