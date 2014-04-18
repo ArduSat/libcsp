@@ -220,18 +220,16 @@ int pbuf_timestamp(pbuf_element_t *buf, CSP_BASE_TYPE *task_woken) {
 
 }
 
-/** pbuf_free_with_lock
+/** pbuf_free
  * Free buffer element and associated CSP packet buffer element.
  * @param buf Buffer element to free
- * @param task_woken
- * @param lock Synchronize access with CSP_{ENTER,EXIT}_CRITICAL(pbuf_sem) if true.
  * @return 0 on success, -1 on error.
  */
-static int pbuf_free_with_lock(pbuf_element_t *buf, CSP_BASE_TYPE *task_woken, bool lock) {
+static int pbuf_free(pbuf_element_t *buf, CSP_BASE_TYPE *task_woken) {
 	int32_t refcount;
 
 	/* Lock packet buffer */
-	if (lock)
+	if (task_woken == NULL)
 		CSP_ENTER_CRITICAL(pbuf_sem);
 
 	/* Free CSP packet */
@@ -262,20 +260,11 @@ static int pbuf_free_with_lock(pbuf_element_t *buf, CSP_BASE_TYPE *task_woken, b
 	buf->remain = 0;
 
 	/* Unlock packet buffer */
-	if (lock)
+	if (task_woken == NULL)
 		CSP_EXIT_CRITICAL(pbuf_sem);
 
 	return CSP_ERR_NONE;
-}
 
-/** pbuf_free
- * Free buffer element and associated CSP packet buffer element.
- * @param buf Buffer element to free
- * @param task_woken //Helpful. Thanks gomspace
- * @return 0 on success, -1 on error.
- */
-static int pbuf_free(pbuf_element_t *buf, CSP_BASE_TYPE *task_woken) {
-	return pbuf_free_with_lock(buf, task_woken, (task_woken == NULL));
 }
 
 /** pbuf_new
@@ -373,7 +362,7 @@ static void pbuf_cleanup(void) {
 			if (now - buf->last_used > PBUF_TIMEOUT_MS) {
 				csp_log_info("CAN Buffer element timed out\r\n");
 				/* Reuse packet buffer */
-				pbuf_free_with_lock(buf, NULL, false);
+				pbuf_free(buf, NULL);
 			}
 		}
 	}
