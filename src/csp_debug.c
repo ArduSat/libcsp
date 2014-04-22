@@ -110,6 +110,10 @@ void do_csp_debug(csp_debug_level_t level, const char * format, ...) {
     		vsyslog(LOG_INFO, format, args2);
 		va_end(args2);
 #endif
+		struct timespec ts;
+		clock_gettime(CLOCK_MONOTONIC, &ts);
+		double sec = ts.tv_sec + (ts.tv_nsec / 1e9);
+		printf("%.6f: ", sec);
 		vprintf(format, args);
 #endif
 		csp_sys_set_color(COLOR_RESET);
