@@ -266,6 +266,19 @@ CSP_DEFINE_TASK(csp_task_router) {
 				packet->id.src, packet->id.dst, packet->id.dport,
 				packet->id.sport, packet->id.pri, packet->id.flags, packet->length);
 
+                struct timespec ts;
+                clock_gettime(CLOCK_MONOTONIC, &ts);
+                double sec = ts.tv_sec + (ts.tv_nsec / 1e9);
+                printf("%.3f: input header", sec);
+                if (packet->length >= 5) {
+                    for (int i = packet->length - 5; i < packet->length; i++) {
+                        printf(" %02x", packet->data[i]);
+                    }
+                    printf("\n");
+                } else {
+                    printf(" less than 5 bytes\n");
+                }
+
 		/* Here there be promiscuous mode */
 #ifdef CSP_USE_PROMISC
 		csp_promisc_add(packet, csp_promisc_queue);

@@ -215,6 +215,20 @@ int csp_send_direct(csp_id_t idout, csp_packet_t * packet, uint32_t timeout) {
 	csp_log_packet("Output: Src %u, Dst %u, Dport %u, Sport %u, Pri %u, Flags 0x%02X, Size %u VIA: %s\r\n",
 		idout.src, idout.dst, idout.dport, idout.sport, idout.pri, idout.flags, packet->length, ifout->interface->name);
 
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        double sec = ts.tv_sec + (ts.tv_nsec / 1e9);
+        printf("%.3f: output header", sec);
+        if (packet->length >= 5) {
+            for (int i = packet->length - 5; i < packet->length; i++) {
+                printf(" %02x", packet->data[i]);
+            }
+            printf("\n");
+        } else {
+            printf(" less than 5 bytes\n");
+        }
+
+
 #ifdef CSP_USE_PROMISC
 	/* Loopback traffic is added to promisc queue by the router */
 	if (idout.dst != my_address && idout.src == my_address) {
