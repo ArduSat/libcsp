@@ -25,6 +25,7 @@ import sys
 
 APPNAME = 'libcsp'
 VERSION = '1.0.1'
+DEVELOPMENT_AES256_KEY = "01234567890123456789012345678901"
 
 top	= '.'
 out	= 'build'
@@ -58,7 +59,7 @@ def options(ctx):
 	# AES256 Options
 	gr.add_option('--replace-xtea-with-aes256', action='store_true', default=True, help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
 	gr.add_option('--disable-aes256-table', action='store_true', help="Don't precompute AES256 tables (slower, uses less memory)")
-	gr.add_option('--aes256-key', metavar='KEY', default='01234567890123456789012345678901', help="Set AES256 encryption key (must be 32 bytes)")
+	gr.add_option('--aes256-key', metavar='KEY', default=DEVELOPMENT_AES256_KEY, help="Set AES256 encryption key (must be 32 bytes)")
 
 	# Interfaces
 	gr.add_option('--enable-if-i2c', action='store_true', help='Enable I2C interface')
@@ -210,6 +211,37 @@ def configure(ctx):
 			sys.exit('    ERROR: --aes256-key KEY: KEY must be 32-character string ([^"]{32})')
 		else:
 			ctx.define('AES256_ENCRYPTION_KEY', ctx.options.aes256_key, True);
+
+	if ctx.options.aes256_key == DEVELOPMENT_AES256_KEY:
+		print ""
+		print "    ***                            WARNING                              *** "
+		print "    ***                      DEVELOPMENT AES256 KEY                     *** "
+		print "                                 ______________                              "
+		print "                               /.--------------.\                           "
+		print "                              //                \\\                          "
+		print "                             //                  \\\                         "
+		print "                            || .-..----. .-. .--. ||                        "
+		print "                            ||( ( '-..-'|.-.||.-.|||                        "
+		print "                            || \ \  ||  || ||||_||||                        "
+		print "                            ||._) ) ||  \\'-'/||-' ||                        "
+		print "                             \\\\'-'  `'   `-' `'  //                         "
+		print "                              \\\                //                          "
+		print "                               \\\______________//                           "
+		print "                                '--------------'                            "
+		print "                                      |_|_                                  "
+		print "                               ____ _/ _)_)                                 "
+		print "                                   '  | (_)                                 "
+		print "                                .--'\"\| ()                                  "
+		print "                              mx      | |                                   "
+		print "                                      | |                                   "
+		print "                                      |_|                                   "
+		print ""
+		print ""
+		print "    The AES256 key being used is for development only.  If you are flashing "
+		print "    for launch, specify a different key with --aes256-key                   "
+		print ""
+		print ""
+		print "Are you flashing for flight?"
 
 	if ctx.options.mandate_encryption:
 		ctx.define('CSP_O_DEFAULT', 'CSP_O_XTEA', False)
