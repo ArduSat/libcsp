@@ -444,6 +444,8 @@ void csp_route_add_if(csp_iface_t *ifc) {
 		}
 	}
 
+	/* Initialize the estimated TX completion time */
+	ifc->tx_done_time = csp_get_ms();
 }
 
 int csp_route_set(uint8_t node, csp_iface_t *ifc, uint8_t nexthop_mac_addr) {

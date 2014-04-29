@@ -237,6 +237,9 @@ typedef struct csp_iface_s {
 	uint32_t txbytes;			/**< Transmitted bytes */
 	uint32_t rxbytes;			/**< Received bytes */
 	uint32_t irq;				/**< Interrupts */
+	uint32_t tx_done_time;			/**< Estimated time when all in-progress transmissions will be complete */
+	float tx_ms_per_byte;			/**< Estimated time to transmit one byte, not counting per-packet overhead */
+	float tx_ms_per_packet;			/**< Estimated per-packet overhead for all layers below CSP */
 	struct csp_iface_s *next;	/**< Next interface */
 } csp_iface_t;
 
