@@ -373,7 +373,12 @@ int csp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	}
 #endif
 
+	conn->in_send = 1;
+
 	ret = csp_send_direct(conn->idout, packet, timeout);
+
+	conn->in_send = 0;
+	conn->last_send_time = csp_get_ms();
 
 	return (ret == CSP_ERR_NONE) ? 1 : 0;
 

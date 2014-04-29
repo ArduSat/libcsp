@@ -583,6 +583,17 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 
 	}
 
+	/*
+	 * If we have CTS but we're not currently transmitting, generate
+	 * a CTS packet to let the other side talk for a bit.
+	 */
+	if (conn->rdp.cts && !conn->in_send) {
+		if (csp_rdp_time_after(csp_get_ms(), conn->last_send_time + 5)) {
+			printf("DEBUG: Generating CTS packet\n");
+			csp_rdp_send_cmp(conn, NULL, RDP_ACK, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
+		}
+	}
+
 	/**
 	 * ACK TIMEOUT:
 	 * Check ACK timeouts, if we have unacknowledged segments
