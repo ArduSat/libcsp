@@ -189,11 +189,6 @@ typedef union {
 // Make the default CSP connection flags global and mutable.  Defined in csp_connect.c
 extern uint32_t csp_o_base_flags;
 
-// AIS is a CSP appliance.  We can't replace XTEA with AES256 there.
-#ifndef CSP_O_AIS_DEFAULT
-#define CSP_O_AIS_DEFAULT CSP_O_NONE
-#endif
-
 #define CSP_PING_SUCCESS	0
 #define CSP_PING_TIMEOUT	-1
 #define CSP_PING_SEND_ERR	-2
