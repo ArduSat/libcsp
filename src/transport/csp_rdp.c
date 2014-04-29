@@ -55,6 +55,7 @@ static uint32_t csp_rdp_packet_timeout = 1000;
 static uint32_t csp_rdp_delayed_acks = 1;
 static uint32_t csp_rdp_ack_timeout = 1000 / 4;
 static uint32_t csp_rdp_ack_delay_count = 4 / 2;
+static uint32_t csp_rdp_use_flow_control = 1;
 
 /* Used for queue calls */
 static CSP_BASE_TYPE pdTrue = 1;
@@ -74,7 +75,8 @@ typedef struct __attribute__((__packed__)) {
 		uint8_t flags;
 		struct __attribute__((__packed__)) {
 #if defined(CSP_BIG_ENDIAN) && !defined(CSP_LITTLE_ENDIAN)
-			unsigned int res : 4;
+			unsigned int res : 3;
+			unsigned int cts : 1;
 			unsigned int syn : 1;
 			unsigned int ack : 1;
 			unsigned int eak : 1;
@@ -84,7 +86,8 @@ typedef struct __attribute__((__packed__)) {
 			unsigned int eak : 1;
 			unsigned int ack : 1;
 			unsigned int syn : 1;
-			unsigned int res : 4;
+			unsigned int cts : 1;
+			unsigned int res : 3;
 #else
   #error "Must define one of CSP_BIG_ENDIAN or CSP_LITTLE_ENDIAN in csp_platform.h"
 #endif
@@ -260,7 +263,8 @@ static int csp_rdp_send_syn(csp_conn_t * conn) {
 	packet->data32[3] = csp_hton32(csp_rdp_delayed_acks);
 	packet->data32[4] = csp_hton32(csp_rdp_ack_timeout);
 	packet->data32[5] = csp_hton32(csp_rdp_ack_delay_count);
-	packet->length = 6 * sizeof(uint32_t);
+	packet->data32[6] = csp_hton32(csp_rdp_use_flow_control);
+	packet->length = 7 * sizeof(uint32_t);
 
 	return csp_rdp_send_cmp(conn, packet, RDP_SYN, conn->rdp.snd_iss, 0);
 
@@ -653,10 +657,13 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		conn->rdp.delayed_acks 		= csp_ntoh32(packet->data32[3]);
 		conn->rdp.ack_timeout 		= csp_ntoh32(packet->data32[4]);
 		conn->rdp.ack_delay_count 	= csp_ntoh32(packet->data32[5]);
+		conn->rdp.use_flow_control 	= csp_ntoh32(packet->data32[6]);
 		csp_log_protocol("RDP: Window Size %u, conn timeout %u, packet timeout %u\r\n",
 				conn->rdp.window_size, conn->rdp.conn_timeout, conn->rdp.packet_timeout);
 		csp_log_protocol("RDP: Delayed acks: %u, ack timeout %u, ack each %u packet\r\n",
 				conn->rdp.delayed_acks, conn->rdp.ack_timeout, conn->rdp.ack_delay_count);
+		csp_log_protocol("RDP: Use flow control: %u\r\n",
+				conn->rdp.use_flow_control);
 
 		/* Connection accepted */
 		conn->rdp.state = RDP_SYN_RCVD;
@@ -879,6 +886,7 @@ int csp_rdp_connect(csp_conn_t * conn, uint32_t timeout) {
 	conn->rdp.delayed_acks	= csp_rdp_delayed_acks;
 	conn->rdp.ack_timeout 	  = csp_rdp_ack_timeout;
 	conn->rdp.ack_delay_count = csp_rdp_ack_delay_count;
+	conn->rdp.use_flow_control = csp_rdp_use_flow_control;
 	conn->rdp.ack_timestamp   = csp_get_ms();
 
 retry:
@@ -1059,7 +1067,8 @@ int csp_rdp_close(csp_conn_t * conn) {
  */
 void csp_rdp_set_opt(unsigned int window_size, unsigned int conn_timeout_ms,
 		unsigned int packet_timeout_ms, unsigned int delayed_acks,
-		unsigned int ack_timeout, unsigned int ack_delay_count) {
+		unsigned int ack_timeout, unsigned int ack_delay_count,
+		unsigned int use_flow_control) {
 	csp_rdp_window_size = window_size;
 	csp_rdp_conn_timeout = conn_timeout_ms;
 	csp_rdp_packet_timeout = packet_timeout_ms;
