@@ -266,6 +266,23 @@ CSP_DEFINE_TASK(csp_task_router) {
 				packet->id.src, packet->id.dst, packet->id.dport,
 				packet->id.sport, packet->id.pri, packet->id.flags, packet->length);
 
+#ifdef __linux__
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		double sec = ts.tv_sec + ts.tv_nsec / 1e9;
+#else
+		double sec = (float)xTaskGetTickCount() / configTICK_RATE_HZ;
+#endif
+
+		printf("%.3f: packet contents (%d bytes):", sec,
+		    packet->length);
+
+		for (int i = 0; i < packet->length; i++) {
+		    if (i % 16 == 0) printf("\n");
+		    printf("%02x ", packet->data[i]);
+		}
+		printf("\n\n");
+
 		/* Here there be promiscuous mode */
 #ifdef CSP_USE_PROMISC
 		csp_promisc_add(packet, csp_promisc_queue);

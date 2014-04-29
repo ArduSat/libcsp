@@ -520,7 +520,7 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	 * After waiting a while in CLOSE-WAIT, the connection should be closed.
 	 */
 	if (conn->rdp.state == RDP_CLOSE_WAIT) {
-		if (csp_rdp_time_after(time_now, conn->timestamp + conn->rdp.conn_timeout)) {
+		if (csp_rdp_time_after(time_now, conn->timestamp)) {
 			csp_log_protocol("CLOSE_WAIT timeout\r\n");
 			csp_close(conn);
 		}
@@ -594,9 +594,9 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 	rx_header->seq_nr = csp_ntoh16(rx_header->seq_nr);
 
 	csp_log_protocol("RDP: Received in S %u: syn %u, ack %u, eack %u, "
-			"rst %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
+			"rst %u, rak %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
 			conn->rdp.state, rx_header->syn, rx_header->ack, rx_header->eak,
-			rx_header->rst, rx_header->seq_nr, rx_header->ack_nr,
+			rx_header->rst, rx_header->rak, rx_header->seq_nr, rx_header->ack_nr,
 			packet->length, packet->length - sizeof(rdp_header_t));
 
 	/* If a RESET was received. */
@@ -972,9 +972,8 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 			return CSP_ERR_TIMEDOUT;
 		}
 
-		printf("DEBUG: updating in_flight from %u\n", in_flight);
+		/* Recompute in_flight */
 		in_flight = conn->rdp.snd_nxt - conn->rdp.snd_una + 1;
-		printf("DEBUG: to %u\n", in_flight);
 	}
 
 	if (conn->rdp.state != RDP_OPEN) {

@@ -215,6 +215,23 @@ int csp_send_direct(csp_id_t idout, csp_packet_t * packet, uint32_t timeout) {
 	csp_log_packet("Output: Src %u, Dst %u, Dport %u, Sport %u, Pri %u, Flags 0x%02X, Size %u VIA: %s\r\n",
 		idout.src, idout.dst, idout.dport, idout.sport, idout.pri, idout.flags, packet->length, ifout->interface->name);
 
+#ifdef __linux__
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        double sec = ts.tv_sec + ts.tv_nsec / 1e9;
+#else
+        double sec = (float)xTaskGetTickCount() / configTICK_RATE_HZ;
+#endif
+
+        printf("%.3f: packet contents (%d bytes):", sec,
+            packet->length);
+
+        for (int i = 0; i < packet->length; i++) {
+            if (i % 16 == 0) printf("\n");
+            printf("%02x ", packet->data[i]);
+        }
+        printf("\n\n");
+
 #ifdef CSP_USE_PROMISC
 	/* Loopback traffic is added to promisc queue by the router */
 	if (idout.dst != my_address && idout.src == my_address) {
