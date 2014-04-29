@@ -54,7 +54,7 @@ def options(ctx):
 	gr.add_option('--enable-examples', action='store_true', help='Enable examples')
 
 	# Encryption options
-	gr.add_option('--mandate-encryption', action='store_true', default=True, help='Make XTEA encryption universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT) (except on AIS)')
+	gr.add_option('--mandate-encryption', action='store_true', default=True, help='Make XTEA encryption universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT)')
 
 	# AES256 Options
 	gr.add_option('--replace-xtea-with-aes256', action='store_true', default=True, help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')

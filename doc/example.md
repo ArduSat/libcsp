@@ -92,7 +92,7 @@ int send_packet(void) {
     }
 
     /* Connect to host HOST, port PORT with regular UDP-like protocol and 1000 ms timeout */
-    csp_conn_t *conn = csp_connect(CSP_PRIO_NORM, HOST, PORT, 1000, CSP_O_DEFAULT);
+    csp_conn_t *conn = csp_connect(CSP_PRIO_NORM, HOST, PORT, 1000, csp_o_base_flags);
     if (conn == NULL) {
         /* Connect failed */
         printf("Connection failed\\n");
