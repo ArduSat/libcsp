@@ -70,6 +70,7 @@ typedef struct {
 	uint32_t ack_delay_count;
 	uint32_t ack_timestamp;
 	uint32_t use_flow_control;
+	uint32_t cts;
 	csp_bin_sem_handle_t tx_wait;
 	csp_queue_handle_t tx_queue;
 	csp_queue_handle_t rx_queue;

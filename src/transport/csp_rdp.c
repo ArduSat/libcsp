@@ -48,7 +48,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define RDP_ACK 0x02
 #define RDP_EAK 0x04
 #define RDP_RST	0x08
-#define RDP_RAK 0x10
+#define RDP_CTS 0x10
 
 static uint32_t csp_rdp_window_size = 4;
 static uint32_t csp_rdp_conn_timeout = 10000;
@@ -77,7 +77,7 @@ typedef struct __attribute__((__packed__)) {
 		struct __attribute__((__packed__)) {
 #if defined(CSP_BIG_ENDIAN) && !defined(CSP_LITTLE_ENDIAN)
 			unsigned int res : 3;
-			unsigned int rak : 1;
+			unsigned int cts : 1;
 			unsigned int syn : 1;
 			unsigned int ack : 1;
 			unsigned int eak : 1;
@@ -87,7 +87,7 @@ typedef struct __attribute__((__packed__)) {
 			unsigned int eak : 1;
 			unsigned int ack : 1;
 			unsigned int syn : 1;
-			unsigned int rak : 1;
+			unsigned int cts : 1;
 			unsigned int res : 3;
 #else
   #error "Must define one of CSP_BIG_ENDIAN or CSP_LITTLE_ENDIAN in csp_platform.h"
@@ -178,7 +178,18 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 	header->eak = (flags & RDP_EAK) ? 1 : 0;
 	header->syn = (flags & RDP_SYN) ? 1 : 0;
 	header->rst = (flags & RDP_RST) ? 1 : 0;
-	header->rak = (flags & RDP_RAK) ? 1 : 0;
+
+	if (conn->rdp.use_flow_control) {
+		/* We should only be sending if it's clear */
+		if (!conn->rdp.cts) {
+			csp_log_error("RDP: Tried to send control message out of turn\r\n");
+			return CSP_ERR_BUSY;
+		}
+
+		/* For now, all control messages imply CTS */
+		header->cts = 1;
+		conn->rdp.cts = 0;
+	}
 
 	/* Send copy to tx_queue, before sending packet to IF */
 	if (flags & RDP_SYN) {
@@ -582,7 +593,8 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	if (conn->rdp.state == RDP_OPEN)
 		if (csp_queue_size(conn->rdp.tx_queue) < (int)conn->rdp.window_size)
 			if (csp_rdp_seq_before(conn->rdp.snd_nxt - conn->rdp.snd_una, conn->rdp.window_size * 2))
-				csp_bin_sem_post(&conn->rdp.tx_wait);
+				if (!conn->rdp.use_flow_control)
+					csp_bin_sem_post(&conn->rdp.tx_wait);
 
 }
 
@@ -594,10 +606,28 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 	rx_header->seq_nr = csp_ntoh16(rx_header->seq_nr);
 
 	csp_log_protocol("RDP: Received in S %u: syn %u, ack %u, eack %u, "
-			"rst %u, rak %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
+			"rst %u, cts %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
 			conn->rdp.state, rx_header->syn, rx_header->ack, rx_header->eak,
-			rx_header->rst, rx_header->rak, rx_header->seq_nr, rx_header->ack_nr,
+			rx_header->rst, rx_header->cts, rx_header->seq_nr, rx_header->ack_nr,
 			packet->length, packet->length - sizeof(rdp_header_t));
+
+	/* We received a CTS, so it's our turn to send */
+	if (rx_header->cts) {
+		if (!conn->rdp.use_flow_control)
+			csp_log_error("RDP: Got CTS on a connection without flow control\r\n");
+
+		/*
+		 * It's possible to get a CTS while we're already clear to
+		 * send, but it should only happen if it's a retransmission.
+		 */
+		if (conn->rdp.cts)
+			csp_log_protocol("RDP: Got redundant CTS\r\n");
+
+		conn->rdp.cts = 1;
+
+		/* Wake up the TX task */
+		csp_bin_sem_post(&conn->rdp.tx_wait);
+	}
 
 	/* If a RESET was received. */
 	if (rx_header->rst) {
@@ -704,7 +734,8 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 				csp_rdp_send_cmp(conn, NULL, RDP_ACK, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
 
 			/* Wake TX task */
-			csp_bin_sem_post(&conn->rdp.tx_wait);
+			if (!conn->rdp.use_flow_control)
+				csp_bin_sem_post(&conn->rdp.tx_wait);
 
 			goto discard_open;
 		}
@@ -759,7 +790,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 				csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_SYN, conn->rdp.snd_iss, conn->rdp.rcv_irs);
 			/* If duplicate data packet received, send EACK back */
 			if (conn->rdp.state == RDP_OPEN) {
-				if (rx_header->rak || !conn->rdp.use_flow_control)
+				if (rx_header->cts || !conn->rdp.use_flow_control)
 					csp_rdp_send_eack(conn);
 			}
 
@@ -804,7 +835,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 				goto discard_open;
 			}
 
-			if (rx_header->rak || !conn->rdp.use_flow_control)
+			if (rx_header->cts || !conn->rdp.use_flow_control)
 				csp_rdp_send_eack(conn);
 
 			goto accepted_open;
@@ -828,7 +859,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		 * Unacknowledged segments are ACKed by csp_rdp_check_timeouts when the buffer is
 		 * no longer full. */
 		if (rx_queue_size + conn->rdp.window_size <= CSP_RX_QUEUE_LENGTH) {
-			if (rx_header->rak || csp_rdp_should_ack(conn))
+			if (rx_header->cts || csp_rdp_should_ack(conn))
 				csp_rdp_send_cmp(conn, NULL, RDP_ACK, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
 		} else {
 			csp_log_protocol("Less than one window free in RX_queue, deferring acknowledgment for %"PRIu16"\r\n", conn->rdp.rcv_cur);
@@ -922,6 +953,7 @@ retry:
 
 	/* Send SYN message */
 	conn->rdp.state = RDP_SYN_SENT;
+	conn->rdp.cts = 1;
 	if (csp_rdp_send_syn(conn) != CSP_ERR_NONE)
 		goto error;
 
@@ -962,10 +994,11 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 		return CSP_ERR_RESET;
 	}
 
-	/* If TX window is full, wait here */
+	/* If TX window is full or we don't have CTS, wait here */
 	uint16_t in_flight = conn->rdp.snd_nxt - conn->rdp.snd_una + 1;
-	if (in_flight > conn->rdp.window_size) {
-		csp_log_protocol("RDP: Waiting for window update before sending seq %u\r\n", conn->rdp.snd_nxt);
+	while (in_flight > conn->rdp.window_size || !conn->rdp.cts) {
+		char *waiting_for = conn->rdp.use_flow_control ? "CTS" : "window update";
+		csp_log_protocol("RDP: Waiting for %s before sending seq %u\r\n", waiting_for, conn->rdp.snd_nxt);
 		csp_bin_sem_wait(&conn->rdp.tx_wait, 0);
 		if ((csp_bin_sem_wait(&conn->rdp.tx_wait, conn->rdp.conn_timeout)) != CSP_SEMAPHORE_OK) {
 			csp_log_error("Timeout during send\r\n");
@@ -987,9 +1020,16 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	tx_header->seq_nr = csp_hton16(conn->rdp.snd_nxt);
 	tx_header->ack = 1;
 
-	/* If this packet fills our TX window, request an ACK */
-	if (conn->rdp.use_flow_control && in_flight == conn->rdp.window_size)
-		tx_header->rak = 1;
+	if (conn->rdp.use_flow_control) {
+		/*
+		 * If this packet fills our TX window, we're done
+		 * transmitting for now; send CTS and wait for the ACK.
+		 */
+		if (in_flight == conn->rdp.window_size) {
+			tx_header->cts = 1;
+			conn->rdp.cts = 0;
+		}
+	}
 
 	/* Send copy to tx_queue */
 	rdp_packet_t * rdp_packet = csp_buffer_clone(packet);
@@ -998,7 +1038,7 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 		return CSP_ERR_NOMEM;
 	}
 
-	if (conn->rdp.use_flow_control && !tx_header->rak) {
+	if (conn->rdp.use_flow_control && !tx_header->cts) {
 		/* Never retransmit this packet unless explicitly requested */
 		rdp_packet->timestamp = csp_get_ms() + 1000000000;
 	} else {
@@ -1014,9 +1054,9 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	}
 
 	csp_log_protocol("RDP: Sending  in S %u: syn %u, ack %u, eack %u, "
-				"rst %u, rak %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
+				"rst %u, cts %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
 				conn->rdp.state, tx_header->syn, tx_header->ack, tx_header->eak,
-				tx_header->rst, tx_header->rak, csp_ntoh16(tx_header->seq_nr), csp_ntoh16(tx_header->ack_nr),
+				tx_header->rst, tx_header->cts, csp_ntoh16(tx_header->seq_nr), csp_ntoh16(tx_header->ack_nr),
 				packet->length, packet->length - sizeof(rdp_header_t));
 
 	conn->rdp.snd_nxt++;
