@@ -49,6 +49,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define RDP_EAK 0x04
 #define RDP_RST	0x08
 #define RDP_CTS 0x10
+#define RDP_RETRANSMIT 0x20
 
 static uint32_t csp_rdp_window_size = 4;
 static uint32_t csp_rdp_conn_timeout = 10000;
@@ -192,7 +193,7 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 	}
 
 	/* Send copy to tx_queue, before sending packet to IF */
-	if (flags & RDP_SYN) {
+	if (flags & RDP_RETRANSMIT) {
 		rdp_packet_t * rdp_packet = csp_buffer_clone(packet);
 		if (rdp_packet == NULL) return CSP_ERR_NOMEM;
 		rdp_packet->timestamp = csp_get_ms();
@@ -279,7 +280,7 @@ static int csp_rdp_send_syn(csp_conn_t * conn) {
 	packet->data32[6] = csp_hton32(csp_rdp_use_flow_control);
 	packet->length = 7 * sizeof(uint32_t);
 
-	return csp_rdp_send_cmp(conn, packet, RDP_SYN, conn->rdp.snd_iss, 0);
+	return csp_rdp_send_cmp(conn, packet, RDP_SYN | RDP_RETRANSMIT, conn->rdp.snd_iss, 0);
 
 }
 
@@ -587,10 +588,10 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	 * If we have CTS but we're not currently transmitting, generate
 	 * a CTS packet to let the other side talk for a bit.
 	 */
-	if (conn->rdp.cts && !conn->in_send) {
+	if (conn->rdp.use_flow_control && conn->rdp.cts && !conn->in_send) {
 		if (csp_rdp_time_after(csp_get_ms(), conn->last_send_time + 5)) {
-			printf("DEBUG: Generating CTS packet\n");
-			csp_rdp_send_cmp(conn, NULL, RDP_ACK, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
+			printf("DEBUG: Generating CTS packet (currently %u, last send %u)\n", csp_get_ms(), conn->last_send_time);
+			csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_RETRANSMIT, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
 		}
 	}
 
@@ -1010,6 +1011,14 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	while (in_flight > conn->rdp.window_size || !conn->rdp.cts) {
 		char *waiting_for = conn->rdp.use_flow_control ? "CTS" : "window update";
 		csp_log_protocol("RDP: Waiting for %s before sending seq %u\r\n", waiting_for, conn->rdp.snd_nxt);
+
+		printf("DEBUG: packet is %d bytes:", packet->length);
+		for (int i = 0; i < packet->length; i++) {
+			if (i % 16 == 0) printf("\n");
+			printf("%02x ", packet->data[i]);
+		}
+		printf("\n");
+
 		csp_bin_sem_wait(&conn->rdp.tx_wait, 0);
 		if ((csp_bin_sem_wait(&conn->rdp.tx_wait, conn->rdp.conn_timeout)) != CSP_SEMAPHORE_OK) {
 			csp_log_error("Timeout during send\r\n");
