@@ -30,7 +30,7 @@
 #include <csp/csp.h>
 
 #include "csp_xtea.h"
-#include "csp_aes256.h"
+#include <csp/crypto/csp_aes256.h>
 
 #ifdef CSP_USE_XTEA
 

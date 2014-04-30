@@ -27,7 +27,7 @@
 */
 #include <stdint.h>
 
-#include "csp_aes256.h"
+#include <csp/crypto/csp_aes256.h>
 
 #ifdef CSP_USE_XTEA
 

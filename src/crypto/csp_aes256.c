@@ -33,7 +33,7 @@
 #include <csp/csp.h>
 #include <csp/csp_endian.h>
 
-#include "csp_aes256.h"
+#include <csp/crypto/csp_aes256.h>
 
 #define F(x)   (((x)<<1) ^ ((((x)>>7) & 1) * 0x1b))
 #define FD(x)  (((x) >> 1) ^ (((x) & 1) ? 0x8d : 0))
@@ -363,6 +363,7 @@ void aes256_encrypt_ecb(aes256_context *ctx, uint8_t *buf)
 } /* aes256_encrypt */
 
 /* -------------------------------------------------------------------------- */
+
 void aes256_decrypt_ecb(aes256_context *ctx, uint8_t *buf)
 {
     uint8_t i, rcon;
@@ -458,4 +459,16 @@ int csp_aes256_set_key(char * key, uint32_t keylen) {
     //memcpy(csp_aes256_key, (uint8_t *)key, AES256_KEYLENGTH);
 
     return CSP_ERR_INVAL;
+}
+
+void aes256_packet_encrypt(aes256_packet * packet) {
+    uint32_t iv[4] = {(uint32_t)rand(), (uint32_t)rand(), 0, 0};
+    packet->iv_nonce[0] = iv[0];
+    packet->iv_nonce[1] = iv[1];
+    csp_aes256_encrypt(packet->data, packet->len, iv);
+}
+
+void aes256_packet_decrypt(aes256_packet * packet) {
+    uint32_t iv[4] = {packet->iv_nonce[0], packet->iv_nonce[1], 0, 0};
+    csp_aes256_decrypt(packet->data, packet->len, iv);
 }

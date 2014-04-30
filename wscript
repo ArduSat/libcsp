@@ -57,6 +57,8 @@ def options(ctx):
 	gr.add_option('--mandate-encryption', action='store_true', default=True, help='Make XTEA encryption universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT)')
 
 	# AES256 Options
+
+	gr.add_option('--encrypt-radio-link', action='store_true', help='Add AES256 encryption to RF link');
 	gr.add_option('--replace-xtea-with-aes256', action='store_true', default=True, help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
 	gr.add_option('--disable-aes256-table', action='store_true', help="Don't precompute AES256 tables (slower, uses less memory)")
 	gr.add_option('--aes256-key', metavar='KEY', default=DEVELOPMENT_AES256_KEY, help="Set AES256 encryption key (must be 32 bytes)")
@@ -193,6 +195,10 @@ def configure(ctx):
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_xtea.c')
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_sha1.c')
 
+	ctx.define_cond('RADIO_LINK_ENCRYPTION_AES256', ctx.options.encrypt_radio_link)
+	ctx.define_cond('AES256_BACK_TO_TABLES', not ctx.options.disable_aes256_table)
+	if ctx.options.replace_xtea_with_aes256 or ctx.options.encrypt_radio_link:
+		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256.c')
 	if ctx.options.replace_xtea_with_aes256:
 		print ""
 		print "    ***       NOTE: Lemur-1 *ONLY* Licensing Restriction Hack           *** "
@@ -203,9 +209,7 @@ def configure(ctx):
 		print "    You should only see this compilation warning during Lemur-1 development "
 		print ""
 		ctx.env['FILES_CSP'].remove('src/crypto/csp_xtea.c')
-		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256.c')
 		ctx.env.append_unique('FILES_CSP', 'src/crypto/csp_aes256_as_xtea.c')
-	ctx.define_cond('AES256_BACK_TO_TABLES', not ctx.options.disable_aes256_table)
 	if ctx.options.aes256_key:
 		if not re.compile('^[^"]{32}$').match(ctx.options.aes256_key):
 			sys.exit('    ERROR: --aes256-key KEY: KEY must be 32-character string ([^"]{32})')
