@@ -801,7 +801,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 				csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_SYN, conn->rdp.snd_iss, conn->rdp.rcv_irs);
 			/* If duplicate data packet received, send EACK back */
 			if (conn->rdp.state == RDP_OPEN) {
-				if (rx_header->cts || !conn->rdp.use_flow_control)
+				if (conn->rdp.cts)
 					csp_rdp_send_eack(conn);
 			}
 
