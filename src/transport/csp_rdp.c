@@ -605,7 +605,8 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	if (conn->rdp.state == RDP_OPEN)
 		if (csp_queue_size(conn->rdp.tx_queue) < (int)conn->rdp.window_size)
 			if (csp_rdp_seq_before(conn->rdp.snd_nxt - conn->rdp.snd_una, conn->rdp.window_size * 2))
-				csp_bin_sem_post(&conn->rdp.tx_wait);
+				if (conn->rdp.cts)
+					csp_bin_sem_post(&conn->rdp.tx_wait);
 
 }
 
