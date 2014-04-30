@@ -361,6 +361,8 @@ int csp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 		return 0;
 	}
 
+	conn->in_send = 1;
+
 #ifdef CSP_USE_RDP
 	if (conn->idout.flags & CSP_FRDP) {
 		if (csp_rdp_send(conn, packet, timeout) != CSP_ERR_NONE) {
@@ -372,8 +374,6 @@ int csp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 		}
 	}
 #endif
-
-	conn->in_send = 1;
 
 	ret = csp_send_direct(conn->idout, packet, timeout);
 

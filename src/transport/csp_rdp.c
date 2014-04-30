@@ -605,8 +605,7 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	if (conn->rdp.state == RDP_OPEN)
 		if (csp_queue_size(conn->rdp.tx_queue) < (int)conn->rdp.window_size)
 			if (csp_rdp_seq_before(conn->rdp.snd_nxt - conn->rdp.snd_una, conn->rdp.window_size * 2))
-				if (!conn->rdp.use_flow_control)
-					csp_bin_sem_post(&conn->rdp.tx_wait);
+				csp_bin_sem_post(&conn->rdp.tx_wait);
 
 }
 
@@ -746,8 +745,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 				csp_rdp_send_cmp(conn, NULL, RDP_ACK, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
 
 			/* Wake TX task */
-			if (!conn->rdp.use_flow_control)
-				csp_bin_sem_post(&conn->rdp.tx_wait);
+			csp_bin_sem_post(&conn->rdp.tx_wait);
 
 			goto discard_open;
 		}
@@ -1009,7 +1007,7 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	/* If TX window is full or we don't have CTS, wait here */
 	uint16_t in_flight = conn->rdp.snd_nxt - conn->rdp.snd_una + 1;
 	while (in_flight > conn->rdp.window_size || !conn->rdp.cts) {
-		char *waiting_for = conn->rdp.use_flow_control ? "CTS" : "window update";
+		char *waiting_for = !conn->rdp.cts ? "CTS" : "window update";
 		csp_log_protocol("RDP: Waiting for %s before sending seq %u\r\n", waiting_for, conn->rdp.snd_nxt);
 
 		printf("DEBUG: packet is %d bytes:", packet->length);
