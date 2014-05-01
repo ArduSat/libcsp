@@ -58,6 +58,7 @@ static uint32_t csp_rdp_delayed_acks = 1;
 static uint32_t csp_rdp_ack_timeout = 1000 / 4;
 static uint32_t csp_rdp_ack_delay_count = 4 / 2;
 static uint32_t csp_rdp_use_flow_control = 1;
+static uint32_t csp_rdp_close_wait_timeout = 500;
 
 /* Used for queue calls */
 static CSP_BASE_TYPE pdTrue = 1;
@@ -532,7 +533,7 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	 * After waiting a while in CLOSE-WAIT, the connection should be closed.
 	 */
 	if (conn->rdp.state == RDP_CLOSE_WAIT) {
-		if (csp_rdp_time_after(time_now, conn->timestamp)) {
+		if (csp_rdp_time_after(time_now, conn->timestamp + csp_rdp_close_wait_timeout)) {
 			csp_log_protocol("CLOSE_WAIT timeout\r\n");
 			csp_close(conn);
 		}
