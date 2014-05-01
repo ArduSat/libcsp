@@ -443,6 +443,10 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 
 static inline bool csp_rdp_should_ack(csp_conn_t * conn) {
 
+	/* If we have data to send, wait and send the ACK with the data */
+	if (conn->in_send)
+		return false;
+
 	/* If delayed ACKs are not used, always ACK */
 	if (!conn->rdp.delayed_acks)
 		return true;
