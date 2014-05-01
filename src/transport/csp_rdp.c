@@ -180,17 +180,9 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 	header->syn = (flags & RDP_SYN) ? 1 : 0;
 	header->rst = (flags & RDP_RST) ? 1 : 0;
 
-	if (conn->rdp.use_flow_control) {
-		/* We should only be sending if it's clear */
-		if (!conn->rdp.cts) {
-			csp_log_error("RDP: Tried to send control message out of turn\r\n");
-			return CSP_ERR_BUSY;
-		}
-
-		/* For now, all control messages imply CTS */
+	/* For now, all control messages imply CTS */
+	if (conn->rdp.use_flow_control)
 		header->cts = 1;
-		conn->rdp.cts = 0;
-	}
 
 	/* Send copy to tx_queue, before sending packet to IF */
 	if (flags & RDP_RETRANSMIT) {
@@ -200,6 +192,18 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 		if (csp_queue_enqueue(conn->rdp.tx_queue, &rdp_packet, 0) != CSP_QUEUE_OK)
 			csp_buffer_free(rdp_packet);
 	}
+
+	/*
+	 * Don't transmit if it's not our turn.  If RDP_RETRANSMIT
+	 * is set, we've queued the packet and we'll retry it later;
+	 * if not, just discard it.
+	 */
+	if (!conn->rdp.cts)
+		return CSP_ERR_BUSY;
+
+	/* After sending a CTS packet, it's no longer our turn to transmit */
+	if (header->cts)
+		conn->rdp.cts = 0;
 
 	/* Send control messages with high priority */
 	idout = conn->idout;
@@ -434,10 +438,6 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 }
 
 static inline bool csp_rdp_should_ack(csp_conn_t * conn) {
-
-	/* If we're using flow control, never ACK unless requested */
-	if (conn->rdp.use_flow_control)
-		return false;
 
 	/* If delayed ACKs are not used, always ACK */
 	if (!conn->rdp.delayed_acks)
@@ -800,10 +800,8 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			if (conn->rdp.state == RDP_SYN_RCVD)
 				csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_SYN, conn->rdp.snd_iss, conn->rdp.rcv_irs);
 			/* If duplicate data packet received, send EACK back */
-			if (conn->rdp.state == RDP_OPEN) {
-				if (conn->rdp.cts)
-					csp_rdp_send_eack(conn);
-			}
+			if (conn->rdp.state == RDP_OPEN)
+				csp_rdp_send_eack(conn);
 
 			goto discard_open;
 		}
@@ -845,10 +843,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 				csp_log_protocol("Duplicate sequence number\r\n");
 				goto discard_open;
 			}
-
-			if (rx_header->cts || !conn->rdp.use_flow_control)
-				csp_rdp_send_eack(conn);
-
+			csp_rdp_send_eack(conn);
 			goto accepted_open;
 		}
 
@@ -870,7 +865,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		 * Unacknowledged segments are ACKed by csp_rdp_check_timeouts when the buffer is
 		 * no longer full. */
 		if (rx_queue_size + conn->rdp.window_size <= CSP_RX_QUEUE_LENGTH) {
-			if (rx_header->cts || csp_rdp_should_ack(conn))
+			if (csp_rdp_should_ack(conn))
 				csp_rdp_send_cmp(conn, NULL, RDP_ACK, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
 		} else {
 			csp_log_protocol("Less than one window free in RX_queue, deferring acknowledgment for %"PRIu16"\r\n", conn->rdp.rcv_cur);
