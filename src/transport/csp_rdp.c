@@ -1133,6 +1133,7 @@ int csp_rdp_close(csp_conn_t * conn) {
 		return CSP_ERR_AGAIN;
 	}
 
+	printf("Flushing RDP queues:\n");
 	csp_rdp_flush_all(conn);	// XXX
 
 	csp_log_protocol("RDP Close in CLOSE_WAIT, now closing\r\n");
