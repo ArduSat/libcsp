@@ -26,7 +26,7 @@ import sys
 APPNAME = 'libcsp'
 VERSION = '1.0.1'
 DEVELOPMENT_AES256_KEY = "01234567890123456789012345678901"
-
+DEVELOPMENT_HMAC_KEY   = "0123456789012345"
 top	= '.'
 out	= 'build'
 
@@ -55,11 +55,15 @@ def options(ctx):
 
 	# Encryption options
 	gr.add_option('--mandate-encryption', action='store_true', default=True, help='Make XTEA encryption universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT)')
-
+	gr.add_option('--mandate-hmac', action='store_true', default=True, help='Make HMAC universal (via CSP_O_DEFAULT, CSP_SO_DEFAULT)')
+	
 	# AES256 Options
 	gr.add_option('--replace-xtea-with-aes256', action='store_true', default=True, help='LEMUR-1 LICENSING HACK: substitute AES256 for XTEA')
 	gr.add_option('--disable-aes256-table', action='store_true', help="Don't precompute AES256 tables (slower, uses less memory)")
-	gr.add_option('--aes256-key', metavar='KEY', default=DEVELOPMENT_AES256_KEY, help="Set AES256 encryption key (must be 32 bytes)")
+	gr.add_option('--aes256-key', metavar='KEY', default=DEVELOPMENT_AES256_KEY, help="Set AES256 encryption key (must be 32 bytes, use extended ascii for enhanced security)")
+
+	# HMAC Options
+	gr.add_option('--hmac-key', metavar='KEY', default=DEVELOPMENT_HMAC_KEY, help="Set HMAC encryption key (must be 16 characters, use extended ascii for enhanced security)")
 
 	# Interfaces
 	gr.add_option('--enable-if-i2c', action='store_true', help='Enable I2C interface')
@@ -210,12 +214,18 @@ def configure(ctx):
 		if not re.compile('^[^"]{32}$').match(ctx.options.aes256_key):
 			sys.exit('    ERROR: --aes256-key KEY: KEY must be 32-character string ([^"]{32})')
 		else:
-			ctx.define('AES256_ENCRYPTION_KEY', ctx.options.aes256_key, True);
+			ctx.define('AES256_ENCRYPTION_KEY', ctx.options.aes256_key, True)
 
-	if ctx.options.aes256_key == DEVELOPMENT_AES256_KEY:
+	if ctx.options.hmac_key:
+		if not re.compile('^[^"]{16}$').match(ctx.options.hmac_key):
+			sys.exit('    ERROR: --hmac-key KEY: KEY must be 16-character string ([^"]{32})')
+		else:
+			ctx.define('HMAC_KEY', ctx.options.hmac_key, True)
+
+	if ctx.options.aes256_key == DEVELOPMENT_AES256_KEY or ctx.options.hmac_key == DEVELOPMENT_HMAC_KEY:
 		print ""
-		print "    ***                            WARNING                              *** "
-		print "    ***                      DEVELOPMENT AES256 KEY                     *** "
+		print "    ***                              WARNING                             *** "
+		print "    ***                     DEVELOPMENT ENCRYPTION KEY                   *** "
 		print "                                 ______________                              "
 		print "                               /.--------------.\                           "
 		print "                              //                \\\                          "
@@ -237,15 +247,23 @@ def configure(ctx):
 		print "                                      |_|                                   "
 		print ""
 		print ""
-		print "    The AES256 key being used is for development only.  If you are flashing "
-		print "    for launch, specify a different key with --aes256-key                   "
+		print "    The AES256 or HMAC key being used is for development only.  If you are  "
+		print "    flashing for launch, specify a different key with --[aes256|hmac]-key   "
 		print ""
 		print ""
 		print "Are you flashing for flight?"
 
+	# Configure defaults for CSP flags
+	csp_o_default  = "CSP_O_NONE"
+	csp_so_default = "CSP_SO_NONE"
 	if ctx.options.mandate_encryption:
-		ctx.define('CSP_O_DEFAULT', 'CSP_O_XTEA', False)
-		ctx.define('CSP_SO_DEFAULT', 'CSP_SO_XTEAREQ', False)
+		csp_o_default += " | CSP_O_XTEA"
+		csp_so_default += " | CSP_SO_XTEAREQ"
+	if ctx.options.mandate_hmac:
+		csp_o_default += " | CSP_O_HMAC"
+		csp_so_default += " | CSP_SO_HMACREQ"
+	ctx.define('CSP_O_DEFAULT', csp_o_default, False)
+	ctx.define('CSP_SO_DEFAULT', csp_so_default, False)
 
 	ctx.define_cond('CSP_DEBUG', not ctx.options.disable_debug)
 	ctx.define_cond('CSP_DISABLE_OUTPUT', ctx.options.disable_output)
