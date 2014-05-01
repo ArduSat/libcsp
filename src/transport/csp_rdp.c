@@ -839,7 +839,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		}
 
 		/* If there's no data, we're done unless it's a NUL segment */
-		if (packet->length == 0 && !rx_header->nul)
+		if (packet->length <= sizeof(rdp_header_t) && !rx_header->nul)
 			goto discard_open;
 
 		/* If message is not in sequence, send EACK and store packet */
