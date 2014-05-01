@@ -48,8 +48,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define RDP_ACK 0x02
 #define RDP_EAK 0x04
 #define RDP_RST	0x08
-#define RDP_CTS 0x10
-#define RDP_RETRANSMIT 0x20
+#define RDP_NUL 0x10
+#define RDP_RETRANSMIT 0x80
 
 static uint32_t csp_rdp_window_size = 4;
 static uint32_t csp_rdp_conn_timeout = 10000;
@@ -78,8 +78,9 @@ typedef struct __attribute__((__packed__)) {
 		uint8_t flags;
 		struct __attribute__((__packed__)) {
 #if defined(CSP_BIG_ENDIAN) && !defined(CSP_LITTLE_ENDIAN)
-			unsigned int res : 3;
+			unsigned int res : 2;
 			unsigned int cts : 1;
+			unsigned int nul : 1;
 			unsigned int syn : 1;
 			unsigned int ack : 1;
 			unsigned int eak : 1;
@@ -89,8 +90,9 @@ typedef struct __attribute__((__packed__)) {
 			unsigned int eak : 1;
 			unsigned int ack : 1;
 			unsigned int syn : 1;
+			unsigned int nul : 1;
 			unsigned int cts : 1;
-			unsigned int res : 3;
+			unsigned int res : 2;
 #else
   #error "Must define one of CSP_BIG_ENDIAN or CSP_LITTLE_ENDIAN in csp_platform.h"
 #endif
@@ -180,6 +182,7 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 	header->eak = (flags & RDP_EAK) ? 1 : 0;
 	header->syn = (flags & RDP_SYN) ? 1 : 0;
 	header->rst = (flags & RDP_RST) ? 1 : 0;
+	header->nul = (flags & RDP_NUL) ? 1 : 0;
 
 	/* For now, all control messages imply CTS */
 	if (conn->rdp.use_flow_control)
@@ -202,7 +205,7 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 	if (!conn->rdp.cts)
 		return CSP_ERR_BUSY;
 
-	/* After sending a CTS packet, it's no longer our turn to transmit */
+	/* After sending a CTS segment, it's no longer our turn to transmit */
 	if (header->cts)
 		conn->rdp.cts = 0;
 
@@ -587,12 +590,13 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 
 	/*
 	 * If we have CTS but we're not currently transmitting, generate
-	 * a CTS packet to let the other side talk for a bit.
+	 * a NUL segment to let the other side talk.
 	 */
 	if (conn->rdp.use_flow_control && conn->rdp.cts && !conn->in_send) {
 		if (csp_rdp_time_after(csp_get_ms(), conn->last_send_time + 5)) {
-			printf("DEBUG: Generating CTS packet (currently %u, last send %u)\n", csp_get_ms(), conn->last_send_time);
-			csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_RETRANSMIT, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
+			printf("DEBUG: Generating NUL segment (currently %u, last send %u)\n", csp_get_ms(), conn->last_send_time);
+			csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_NUL | RDP_RETRANSMIT, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
+			conn->rdp.snd_nxt++;
 		}
 	}
 
@@ -619,14 +623,14 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 	rx_header->seq_nr = csp_ntoh16(rx_header->seq_nr);
 
 	csp_log_protocol("RDP: Received in S %u: syn %u, ack %u, eack %u, "
-			"rst %u, cts %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
+			"rst %u, nul %u, cts %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
 			conn->rdp.state, rx_header->syn, rx_header->ack, rx_header->eak,
-			rx_header->rst, rx_header->cts, rx_header->seq_nr, rx_header->ack_nr,
-			packet->length, packet->length - sizeof(rdp_header_t));
+			rx_header->rst, rx_header->nul, rx_header->cts, rx_header->seq_nr,
+			rx_header->ack_nr, packet->length, packet->length - sizeof(rdp_header_t));
 
 	/* We received a CTS, so it's our turn to send */
 	if (rx_header->cts) {
-		if (!conn->rdp.use_flow_control)
+		if (!conn->rdp.use_flow_control && !(rx_header->syn || rx_header->rst))
 			csp_log_error("RDP: Got CTS on a connection without flow control\r\n");
 
 		/*
@@ -834,8 +838,8 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			goto discard_open;
 		}
 
-		/* If no data, return here */
-		if (packet->length <= sizeof(rdp_header_t))
+		/* If there's no data, we're done unless it's a NUL segment */
+		if (packet->length == 0 && !rx_header->nul)
 			goto discard_open;
 
 		/* If message is not in sequence, send EACK and store packet */
@@ -851,14 +855,16 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		/* Store sequence number before stripping RDP header */
 		uint16_t seq_nr = rx_header->seq_nr;
 
-		/* Receive data */
-		if (csp_rdp_receive_data(conn, packet) != CSP_ERR_NONE)
-			goto discard_open;
+		/* Receive data, unless it's a NUL segment */
+		if (!rx_header->nul) {
+			if (csp_rdp_receive_data(conn, packet) != CSP_ERR_NONE)
+				goto discard_open;
+		}
 
 		/* Update last received packet */
 		conn->rdp.rcv_cur = seq_nr;
 
-		/* The message is in sequence and contains data */
+		/* The message is in sequence */
 		int rxq = csp_conn_get_rxq(packet->id.pri);
 		int rx_queue_size = csp_queue_size(conn->rx_queue[rxq]);
 
@@ -1037,7 +1043,7 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 
 	if (conn->rdp.use_flow_control) {
 		/*
-		 * If this packet fills our TX window, we're done
+		 * If this segment fills our TX window, we're done
 		 * transmitting for now; send CTS and wait for the ACK.
 		 */
 		if (in_flight == conn->rdp.window_size) {
@@ -1054,7 +1060,7 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	}
 
 	if (conn->rdp.use_flow_control && !tx_header->cts) {
-		/* Never retransmit this packet unless explicitly requested */
+		/* Never retransmit this segment unless explicitly requested */
 		rdp_packet->timestamp = csp_get_ms() + 1000000000;
 	} else {
 		/* Retransmit normally */
@@ -1069,10 +1075,10 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	}
 
 	csp_log_protocol("RDP: Sending  in S %u: syn %u, ack %u, eack %u, "
-				"rst %u, cts %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
+				"rst %u, nul %u, cts %u, seq_nr %5u, ack_nr %5u, packet_len %u (%u)\r\n",
 				conn->rdp.state, tx_header->syn, tx_header->ack, tx_header->eak,
-				tx_header->rst, tx_header->cts, csp_ntoh16(tx_header->seq_nr), csp_ntoh16(tx_header->ack_nr),
-				packet->length, packet->length - sizeof(rdp_header_t));
+				tx_header->rst, tx_header->nul, tx_header->cts, csp_ntoh16(tx_header->seq_nr),
+				csp_ntoh16(tx_header->ack_nr), packet->length, packet->length - sizeof(rdp_header_t));
 
 	conn->rdp.snd_nxt++;
 	return CSP_ERR_NONE;
