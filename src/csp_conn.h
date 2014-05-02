@@ -71,6 +71,7 @@ typedef struct {
 	uint32_t ack_timestamp;
 	uint32_t use_flow_control;
 	uint32_t cts;
+	struct rdp_packet_s * retransmit_packet;
 	csp_bin_sem_handle_t tx_wait;
 	csp_queue_handle_t tx_queue;
 	csp_queue_handle_t rx_queue;

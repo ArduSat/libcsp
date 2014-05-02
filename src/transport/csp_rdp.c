@@ -63,11 +63,13 @@ static uint32_t csp_rdp_close_wait_timeout = 500;
 /* Used for queue calls */
 static CSP_BASE_TYPE pdTrue = 1;
 
-typedef struct __attribute__((__packed__)) {
-	/* The timestamp is placed in the padding bytes */
-	uint8_t padding[CSP_PADDING_BYTES - 2 * sizeof(uint32_t)];
+typedef struct __attribute__((__packed__)) rdp_packet_s {
+	/* The timestamp, etc. are placed in the padding bytes */
+	uint8_t padding[CSP_PADDING_BYTES - 3 * sizeof(uint32_t)];
 	uint32_t quarantine; 		// EACK quarantine period
 	uint32_t timestamp;			// Time the message was sent
+	uint32_t force_retransmit;	// Retransmit this packet now
+
 	uint16_t length;			// Length field must be just before CSP ID
 	csp_id_t id;				// CSP id must be just before data
 	uint8_t data[];				// This just points to the rest of the buffer, without a size indication.
@@ -193,8 +195,15 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 		rdp_packet_t * rdp_packet = csp_buffer_clone(packet);
 		if (rdp_packet == NULL) return CSP_ERR_NOMEM;
 		rdp_packet->timestamp = csp_get_ms();
+		rdp_packet->quarantine = csp_get_ms();
+		rdp_packet->force_retransmit = 0;
 		if (csp_queue_enqueue(conn->rdp.tx_queue, &rdp_packet, 0) != CSP_QUEUE_OK)
 			csp_buffer_free(rdp_packet);
+
+		/* Update our retransmit packet -- it should always be the most
+		 * recent packet we've sent that has CTS set */
+		conn->rdp.retransmit_packet = rdp_packet;
+		printf("DEBUG: setting retransmit packet to seqno %d\n", seq_nr);
 	}
 
 	/*
@@ -424,6 +433,7 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 				if (csp_rdp_time_after(time_now, packet->quarantine)) {
 					packet->timestamp = time_now - conn->rdp.packet_timeout - 1;
 					packet->quarantine = time_now +	conn->rdp.packet_timeout / 2;
+					packet->force_retransmit = 1;
 				}
 			}
 		}
@@ -434,6 +444,10 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 		} else {
 			/* Found, free */
 			csp_log_protocol("TX Element %u freed\r\n", csp_ntoh16(header->seq_nr));
+			if (conn->rdp.retransmit_packet == packet) {
+				conn->rdp.retransmit_packet = NULL;
+				printf("DEBUG: clearing retransmit_packet\n");
+			}
 			csp_buffer_free(packet);
 		}
 
@@ -477,6 +491,10 @@ void csp_rdp_flush_all(csp_conn_t * conn) {
 	while (csp_queue_dequeue_isr(conn->rdp.tx_queue, &packet, &pdTrue) == CSP_QUEUE_OK) {
 		if (packet != NULL) {
 			csp_log_protocol("Flush TX Element, time %u, seq %u\r\n", packet->timestamp, csp_ntoh16(csp_rdp_header_ref((csp_packet_t *) packet)->seq_nr));
+			if (conn->rdp.retransmit_packet == packet) {
+				conn->rdp.retransmit_packet = NULL;
+				printf("DEBUG: clearing retransmit_packet\n");
+			}
 			csp_buffer_free(packet);
 		}
 	}
@@ -566,13 +584,22 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 		/* If acked, do not retransmit */
 		if (csp_rdp_seq_before(csp_ntoh16(header->seq_nr), conn->rdp.snd_una)) {
 			csp_log_protocol("TX Element Free, time %u, seq %u, una %u\r\n", packet->timestamp, csp_ntoh16(header->seq_nr), conn->rdp.snd_una);
+			if (conn->rdp.retransmit_packet == packet) {
+				conn->rdp.retransmit_packet = NULL;
+				printf("DEBUG: clearing retransmit_packet\n");
+			}
 			csp_buffer_free(packet);
 			continue;
 		}
 
 		/* Check timestamp and retransmit if needed */
-		if (csp_rdp_time_after(time_now, packet->timestamp + conn->rdp.packet_timeout)) {
+		if (packet->force_retransmit || (packet == conn->rdp.retransmit_packet && csp_rdp_time_after(time_now, packet->timestamp + conn->rdp.packet_timeout))) {
+
+			packet->force_retransmit = 0;
 			csp_log_protocol("TX Element timed out, retransmitting seq %u\r\n", csp_ntoh16(header->seq_nr));
+
+			if (packet == conn->rdp.retransmit_packet)
+				printf("DEBUG: it's the retransmit packet\n");
 
 			/* Update to latest outgoing ACK */
 			header->ack_nr = csp_hton16(conn->rdp.rcv_cur);
@@ -726,7 +753,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		conn->rdp.state = RDP_SYN_RCVD;
 
 		/* Send SYN/ACK */
-		csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_SYN, conn->rdp.snd_iss, conn->rdp.rcv_irs);
+		csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_SYN | RDP_RETRANSMIT, conn->rdp.snd_iss, conn->rdp.rcv_irs);
 
 		goto discard_open;
 
@@ -1063,19 +1090,21 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 		return CSP_ERR_NOMEM;
 	}
 
-	if (conn->rdp.use_flow_control && !tx_header->cts) {
-		/* Never retransmit this segment unless explicitly requested */
-		rdp_packet->timestamp = csp_get_ms() + 1000000000;
-	} else {
-		/* Retransmit normally */
-		rdp_packet->timestamp = csp_get_ms();
-	}
+	rdp_packet->timestamp = csp_get_ms();
+	rdp_packet->quarantine = csp_get_ms();
+	rdp_packet->force_retransmit = 0;
 
-	rdp_packet->quarantine = csp_get_ms();		// XXX verify this
 	if (csp_queue_enqueue(conn->rdp.tx_queue, &rdp_packet, 0) != CSP_QUEUE_OK) {
 		csp_log_error("No more space in RDP retransmit queue\r\n");
 		csp_buffer_free(rdp_packet);
 		return CSP_ERR_NOBUFS;
+	}
+
+	/* Update our retransmit packet -- it should always be the most recent
+	 * packet we've sent that has CTS set */
+	if (tx_header->cts || !conn->rdp.use_flow_control) {
+		conn->rdp.retransmit_packet = rdp_packet;
+		printf("DEBUG: setting retransmit_packet to seqno %d\n", csp_ntoh16(tx_header->seq_nr));
 	}
 
 	csp_log_protocol("RDP: Sending  in S %u: syn %u, ack %u, eack %u, "
@@ -1142,9 +1171,6 @@ int csp_rdp_close(csp_conn_t * conn) {
 		csp_log_protocol("RDP Close, sent RST on conn %p\r\n", conn);
 		return CSP_ERR_AGAIN;
 	}
-
-	printf("Flushing RDP queues:\n");
-	csp_rdp_flush_all(conn);	// XXX
 
 	csp_log_protocol("RDP Close in CLOSE_WAIT, now closing\r\n");
 	conn->rdp.state = RDP_CLOSED;
