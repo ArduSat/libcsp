@@ -685,6 +685,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 
 	if (rand_r(&conn->rdp.simulate_loss_seed) % 100 < conn->rdp.simulate_loss_pct) {
 		csp_log_error("RDP: Simulating loss of received packet\r\n");
+		csp_buffer_free(packet);
 		return;
 	}
 
