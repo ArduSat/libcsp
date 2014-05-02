@@ -434,7 +434,7 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 				match = 1;
 
 			/* Enable this if you want EACK's to trigger retransmission */
-			if (csp_ntoh16(eack_packet->data16[j]) > csp_ntoh16(header->seq_nr)) {
+			if (csp_ntoh16(eack_packet->data16[j]) >= csp_ntoh16(header->seq_nr)) {
 				uint32_t time_now = csp_get_ms();
 				if (csp_rdp_time_after(time_now, packet->quarantine)) {
 					packet->timestamp = time_now - conn->rdp.packet_timeout - 1;
@@ -453,10 +453,10 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 			 * packet yet, because we won't have room to add a new
 			 * retransmit packet afterwards!
 			 *
-			 * This is inefficient, of course.  The right thing would
-			 * be to fix GomSpace's window size calculation -- it should
-			 * be based on the number of actual outstanding packets, not
-			 * the range of sequence numbers.
+			 * This is inefficient.  The right thing would be to fix
+			 * GomSpace's window size calculation in csp_send_rdp --
+			 * it should be based on the number of actual outstanding
+			 * packets, not the range of sequence numbers.
 			 */
 			uint16_t in_flight = conn->rdp.snd_nxt - conn->rdp.snd_una + 1;
 			if (conn->rdp.use_flow_control && in_flight > conn->rdp.window_size && packet == conn->rdp.retransmit_packet) {
@@ -646,7 +646,7 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	 * If we have CTS but we're not currently transmitting, generate
 	 * a NUL segment to let the other side talk.
 	 */
-	if (conn->rdp.use_flow_control && conn->rdp.cts && !conn->in_send) {
+	if (conn->rdp.use_flow_control && conn->rdp.cts && !conn->rdp.retransmit_packet && !conn->in_send) {
 		if (csp_rdp_time_after(csp_get_ms(), conn->last_send_time + 5)) {
 			printf("DEBUG: Generating NUL segment (currently %u, last send %u)\n", csp_get_ms(), conn->last_send_time);
 			csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_NUL | RDP_RETRANSMIT, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
