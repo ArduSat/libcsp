@@ -266,6 +266,7 @@ CSP_DEFINE_TASK(csp_task_router) {
 				packet->id.src, packet->id.dst, packet->id.dport,
 				packet->id.sport, packet->id.pri, packet->id.flags, packet->length);
 
+#if 0
 #ifdef __linux__
 		struct timespec ts;
 		clock_gettime(CLOCK_REALTIME, &ts);
@@ -282,6 +283,7 @@ CSP_DEFINE_TASK(csp_task_router) {
 		    printf("%02x ", packet->data[i]);
 		}
 		printf("\n\n");
+#endif
 
 		/* Here there be promiscuous mode */
 #ifdef CSP_USE_PROMISC

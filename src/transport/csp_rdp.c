@@ -207,7 +207,7 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 		/* Update our retransmit packet -- it should always be the most
 		 * recent packet we've sent that has CTS set */
 		conn->rdp.retransmit_packet = rdp_packet;
-		printf("DEBUG: setting retransmit packet to seqno %d\n", seq_nr);
+		//printf("DEBUG: setting retransmit packet to seqno %d\n", seq_nr);
 	}
 
 	/*
@@ -460,7 +460,7 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 			 */
 			uint16_t in_flight = conn->rdp.snd_nxt - conn->rdp.snd_una + 1;
 			if (conn->rdp.use_flow_control && in_flight > conn->rdp.window_size && packet == conn->rdp.retransmit_packet) {
-				printf("DEBUG: not freeing seqno %d\n", csp_ntoh16(header->seq_nr));
+				//printf("DEBUG: not freeing seqno %d\n", csp_ntoh16(header->seq_nr));
 				csp_queue_enqueue(conn->rdp.tx_queue, &packet, 0);
 				continue;
 			}
@@ -469,7 +469,7 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 			csp_log_protocol("TX Element %u freed\r\n", csp_ntoh16(header->seq_nr));
 			if (conn->rdp.retransmit_packet == packet) {
 				conn->rdp.retransmit_packet = NULL;
-				printf("DEBUG: clearing retransmit_packet\n");
+				//printf("DEBUG: clearing retransmit_packet\n");
 			}
 			csp_buffer_free(packet);
 		}
@@ -516,7 +516,7 @@ void csp_rdp_flush_all(csp_conn_t * conn) {
 			csp_log_protocol("Flush TX Element, time %u, seq %u\r\n", packet->timestamp, csp_ntoh16(csp_rdp_header_ref((csp_packet_t *) packet)->seq_nr));
 			if (conn->rdp.retransmit_packet == packet) {
 				conn->rdp.retransmit_packet = NULL;
-				printf("DEBUG: clearing retransmit_packet\n");
+				//printf("DEBUG: clearing retransmit_packet\n");
 			}
 			csp_buffer_free(packet);
 		}
@@ -609,7 +609,7 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 			csp_log_protocol("TX Element Free, time %u, seq %u, una %u\r\n", packet->timestamp, csp_ntoh16(header->seq_nr), conn->rdp.snd_una);
 			if (conn->rdp.retransmit_packet == packet) {
 				conn->rdp.retransmit_packet = NULL;
-				printf("DEBUG: clearing retransmit_packet\n");
+				//printf("DEBUG: clearing retransmit_packet\n");
 			}
 			csp_buffer_free(packet);
 			continue;
@@ -621,8 +621,10 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 			packet->force_retransmit = 0;
 			csp_log_protocol("TX Element timed out, retransmitting seq %u\r\n", csp_ntoh16(header->seq_nr));
 
+#if 0
 			if (packet == conn->rdp.retransmit_packet)
 				printf("DEBUG: it's the retransmit packet\n");
+#endif
 
 			/* Update to latest outgoing ACK */
 			header->ack_nr = csp_hton16(conn->rdp.rcv_cur);
@@ -648,7 +650,7 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	 */
 	if (conn->rdp.use_flow_control && conn->rdp.cts && !conn->rdp.retransmit_packet && !conn->in_send) {
 		if (csp_rdp_time_after(csp_get_ms(), conn->last_send_time + 5)) {
-			printf("DEBUG: Generating NUL segment (currently %u, last send %u)\n", csp_get_ms(), conn->last_send_time);
+			//printf("DEBUG: Generating NUL segment (currently %u, last send %u)\n", csp_get_ms(), conn->last_send_time);
 			csp_rdp_send_cmp(conn, NULL, RDP_ACK | RDP_NUL | RDP_RETRANSMIT, conn->rdp.snd_nxt, conn->rdp.rcv_cur);
 			conn->rdp.snd_nxt++;
 		}
@@ -1077,12 +1079,14 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 		char *waiting_for = !conn->rdp.cts ? "CTS" : "window update";
 		csp_log_protocol("RDP: Waiting for %s before sending seq %u\r\n", waiting_for, conn->rdp.snd_nxt);
 
+#if 0
 		printf("DEBUG: packet is %d bytes:", packet->length);
 		for (int i = 0; i < packet->length; i++) {
 			if (i % 16 == 0) printf("\n");
 			printf("%02x ", packet->data[i]);
 		}
 		printf("\n");
+#endif
 
 		csp_bin_sem_wait(&conn->rdp.tx_wait, 0);
 		if ((csp_bin_sem_wait(&conn->rdp.tx_wait, conn->rdp.conn_timeout)) != CSP_SEMAPHORE_OK) {
@@ -1137,7 +1141,7 @@ int csp_rdp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 	 * packet we've sent that has CTS set */
 	if (tx_header->cts || !conn->rdp.use_flow_control) {
 		conn->rdp.retransmit_packet = rdp_packet;
-		printf("DEBUG: setting retransmit_packet to seqno %d\n", csp_ntoh16(tx_header->seq_nr));
+		//printf("DEBUG: setting retransmit_packet to seqno %d\n", csp_ntoh16(tx_header->seq_nr));
 	}
 
 	csp_log_protocol("RDP: Sending  in S %u: syn %u, ack %u, eack %u, "

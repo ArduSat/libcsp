@@ -225,6 +225,7 @@ int csp_send_direct(csp_id_t idout, csp_packet_t * packet, uint32_t timeout) {
 	csp_log_packet("Output: Src %u, Dst %u, Dport %u, Sport %u, Pri %u, Flags 0x%02X, Size %u VIA: %s\r\n",
 		idout.src, idout.dst, idout.dport, idout.sport, idout.pri, idout.flags, packet->length, ifout->interface->name);
 
+#if 0
 #ifdef __linux__
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
@@ -241,6 +242,7 @@ int csp_send_direct(csp_id_t idout, csp_packet_t * packet, uint32_t timeout) {
             printf("%02x ", packet->data[i]);
         }
         printf("\n\n");
+#endif
 
 #ifdef CSP_USE_PROMISC
 	/* Loopback traffic is added to promisc queue by the router */
@@ -337,8 +339,10 @@ int csp_send_direct(csp_id_t idout, csp_packet_t * packet, uint32_t timeout) {
 			ifout->interface->tx_ms_per_packet
 			+ bytes * ifout->interface->tx_ms_per_byte;
 
+#if 0
 		printf("DEBUG: now %u, expected completion at %u\n",
 			time_now, ifout->interface->tx_done_time);
+#endif
 	}
 
 	ifout->interface->tx++;
