@@ -33,8 +33,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define HMAC_KEY_LENGTH	16
 
-/* HMAC key */
-static uint8_t csp_hmac_key[HMAC_KEY_LENGTH];
+/* We use HMAC_KEY to force key assignment at compile time.  This prevents use
+ * of blank key, though the following approach will truncate HMAC_KEY if longer
+ * than HMAC_KEY_LENGTH.  Checked for elsewhere in the build process.  Also need
+ * to make sure extended ascii is used or key length is effectively reduced.
+ */
+static uint8_t csp_hmac_key[HMAC_KEY_LENGTH] = HMAC_KEY;
 
 /* HMAC state structure */
 typedef struct {

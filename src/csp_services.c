@@ -109,7 +109,7 @@ void csp_ping_noreply(uint8_t node) {
 		return;
 
 	/* Open connection */
-	csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, node, CSP_PING, 0, CSP_O_DEFAULT);
+	csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, node, CSP_PING, 0, csp_o_base_flags);
 	if (conn == NULL) {
 		csp_buffer_free(packet);
 		return;
@@ -136,7 +136,7 @@ void csp_reboot(uint8_t node) {
 void csp_ps(uint8_t node, uint32_t timeout) {
 
 	/* Open connection */
-	csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, node, CSP_PS, 0, CSP_O_DEFAULT);
+	csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, node, CSP_PS, 0, csp_o_base_flags);
 	if (conn == NULL)
 		return;
 

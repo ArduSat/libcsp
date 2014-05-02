@@ -36,6 +36,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "csp_conn.h"
 #include "transport/csp_transport.h"
 
+/* Basic set of csp flags to use for outgoing packets */
+uint32_t csp_o_base_flags = CSP_O_DEFAULT;
+
 /* Static connection pool */
 static csp_conn_t arr_conn[CSP_CONN_MAX];
 
