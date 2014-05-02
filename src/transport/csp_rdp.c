@@ -60,8 +60,9 @@ static uint32_t csp_rdp_ack_delay_count = 4 / 2;
 static uint32_t csp_rdp_use_flow_control = 1;
 static uint32_t csp_rdp_close_wait_timeout = 500;
 
-static int32_t csp_rdp_simulate_packet_loss_pct = 30;
-static unsigned int csp_rdp_simulate_packet_loss_seed = 0;
+static int32_t csp_rdp_simulate_upstream_loss_pct = 0;
+static int32_t csp_rdp_simulate_downstream_loss_pct = 0;
+static unsigned int csp_rdp_simulate_loss_seed = 0;
 
 /* Used for queue calls */
 static CSP_BASE_TYPE pdTrue = 1;
@@ -298,7 +299,9 @@ static int csp_rdp_send_syn(csp_conn_t * conn) {
 	packet->data32[4] = csp_hton32(csp_rdp_ack_timeout);
 	packet->data32[5] = csp_hton32(csp_rdp_ack_delay_count);
 	packet->data32[6] = csp_hton32(csp_rdp_use_flow_control);
-	packet->length = 7 * sizeof(uint32_t);
+	packet->data32[7] = csp_hton32(csp_rdp_simulate_upstream_loss_pct);
+	packet->data32[8] = csp_hton32(~csp_rdp_simulate_loss_seed);
+	packet->length = 9 * sizeof(uint32_t);
 
 	return csp_rdp_send_cmp(conn, packet, RDP_SYN | RDP_RETRANSMIT, conn->rdp.snd_iss, 0);
 
@@ -662,7 +665,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			rx_header->rst, rx_header->nul, rx_header->cts, rx_header->seq_nr,
 			rx_header->ack_nr, packet->length, packet->length - sizeof(rdp_header_t));
 
-	if (rand_r(&csp_rdp_simulate_packet_loss_seed) % 100 < csp_rdp_simulate_packet_loss_pct) {
+	if (rand_r(&conn->rdp.simulate_loss_seed) % 100 < conn->rdp.simulate_loss_pct) {
 		csp_log_error("RDP: Simulating loss of received packet\r\n");
 		return;
 	}
@@ -750,12 +753,14 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		conn->rdp.ack_timeout 		= csp_ntoh32(packet->data32[4]);
 		conn->rdp.ack_delay_count 	= csp_ntoh32(packet->data32[5]);
 		conn->rdp.use_flow_control 	= csp_ntoh32(packet->data32[6]);
+		conn->rdp.simulate_loss_pct = csp_ntoh32(packet->data32[7]);
+		conn->rdp.simulate_loss_seed= csp_ntoh32(packet->data32[8]);
 		csp_log_protocol("RDP: Window Size %u, conn timeout %u, packet timeout %u\r\n",
 				conn->rdp.window_size, conn->rdp.conn_timeout, conn->rdp.packet_timeout);
 		csp_log_protocol("RDP: Delayed acks: %u, ack timeout %u, ack each %u packet\r\n",
 				conn->rdp.delayed_acks, conn->rdp.ack_timeout, conn->rdp.ack_delay_count);
-		csp_log_protocol("RDP: Use flow control: %u\r\n",
-				conn->rdp.use_flow_control);
+		csp_log_protocol("RDP: Use flow control: %u, simulate loss %u%%, seed %u\r\n",
+				conn->rdp.use_flow_control, conn->rdp.simulate_loss_pct, conn->rdp.simulate_loss_seed);
 
 		/* Connection accepted */
 		conn->rdp.state = RDP_SYN_RCVD;
@@ -981,6 +986,8 @@ int csp_rdp_connect(csp_conn_t * conn, uint32_t timeout) {
 	conn->rdp.ack_timeout 	  = csp_rdp_ack_timeout;
 	conn->rdp.ack_delay_count = csp_rdp_ack_delay_count;
 	conn->rdp.use_flow_control = csp_rdp_use_flow_control;
+	conn->rdp.simulate_loss_pct = csp_rdp_simulate_downstream_loss_pct;
+	conn->rdp.simulate_loss_seed = csp_rdp_simulate_loss_seed;
 	conn->rdp.ack_timestamp   = csp_get_ms();
 
 retry:
@@ -1219,6 +1226,14 @@ void csp_rdp_get_opt(unsigned int * window_size, unsigned int * conn_timeout_ms,
 		*ack_timeout = csp_rdp_ack_timeout;
 	if (ack_delay_count)
 		*ack_delay_count = csp_rdp_ack_delay_count;
+}
+
+void csp_rdp_simulate_loss(unsigned int upstream_loss_pct,
+        unsigned int downstream_loss_pct, unsigned int seed) {
+
+	csp_rdp_simulate_upstream_loss_pct = upstream_loss_pct;
+	csp_rdp_simulate_downstream_loss_pct = downstream_loss_pct;
+	csp_rdp_simulate_loss_seed = seed;
 }
 
 #ifdef CSP_DEBUG

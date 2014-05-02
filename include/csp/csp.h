@@ -637,6 +637,15 @@ void csp_rdp_set_opt(unsigned int window_size, unsigned int conn_timeout_ms,
 		unsigned int ack_timeout, unsigned int ack_delay_count);
 
 /**
+ * Configure simulated packet loss
+ * @param upstream_loss_pct Percentage of upstream packets to lose
+ * @param downstream_loss_pct Percentage of downstream packets to lose
+ * @param seed Seed for random number generation
+ */
+void csp_rdp_simulate_loss(unsigned int upstream_loss_pct,
+		unsigned int downstream_loss_pct, unsigned int seed);
+
+/**
  * Get RDP options
  * @param window_size Window size
  * @param conn_timeout_ms Connection timeout in ms
