@@ -56,6 +56,16 @@ static char * csp_model = NULL;
 extern csp_queue_handle_t csp_promisc_queue;
 #endif
 
+/* Return 1 if time is before cmp */
+static inline int csp_time_before(uint32_t time, uint32_t cmp) {
+        return (int32_t)(time - cmp) < 0;
+}
+
+/* Return 1 if time is after cmp */
+static inline int csp_time_after(uint32_t time, uint32_t cmp) {
+        return csp_time_before(cmp, time);
+}
+
 void csp_set_hostname(char * hostname) {
 	csp_hostname = hostname;
 }
@@ -215,6 +225,25 @@ int csp_send_direct(csp_id_t idout, csp_packet_t * packet, uint32_t timeout) {
 	csp_log_packet("Output: Src %u, Dst %u, Dport %u, Sport %u, Pri %u, Flags 0x%02X, Size %u VIA: %s\r\n",
 		idout.src, idout.dst, idout.dport, idout.sport, idout.pri, idout.flags, packet->length, ifout->interface->name);
 
+#if 0
+#ifdef __linux__
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        double sec = ts.tv_sec + ts.tv_nsec / 1e9;
+#else
+        double sec = (float)xTaskGetTickCount() / configTICK_RATE_HZ;
+#endif
+
+        printf("%.3f: packet contents (%d bytes):", sec,
+            packet->length);
+
+        for (int i = 0; i < packet->length; i++) {
+            if (i % 16 == 0) printf("\n");
+            printf("%02x ", packet->data[i]);
+        }
+        printf("\n\n");
+#endif
+
 #ifdef CSP_USE_PROMISC
 	/* Loopback traffic is added to promisc queue by the router */
 	if (idout.dst != my_address && idout.src == my_address) {
@@ -296,6 +325,26 @@ int csp_send_direct(csp_id_t idout, csp_packet_t * packet, uint32_t timeout) {
 	if ((*ifout->interface->nexthop)(ifout->interface, packet, timeout) != CSP_ERR_NONE)
 		goto tx_err;
 
+	/* Update our transmit-time estimates, if the interface supports it */
+	if (ifout->interface->tx_ms_per_byte) {
+		/*
+		 * If the completion time is in the past, that means
+		 * the interface is not currently transmitting.
+		 */
+		uint32_t time_now = csp_get_ms();
+		if (csp_time_after(time_now, ifout->interface->tx_done_time))
+			ifout->interface->tx_done_time = time_now;
+
+		ifout->interface->tx_done_time +=
+			ifout->interface->tx_ms_per_packet
+			+ bytes * ifout->interface->tx_ms_per_byte;
+
+#if 0
+		printf("DEBUG: now %u, expected completion at %u\n",
+			time_now, ifout->interface->tx_done_time);
+#endif
+	}
+
 	ifout->interface->tx++;
 	ifout->interface->txbytes += bytes;
 	return CSP_ERR_NONE;
@@ -316,6 +365,8 @@ int csp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 		return 0;
 	}
 
+	conn->in_send = 1;
+
 #ifdef CSP_USE_RDP
 	if (conn->idout.flags & CSP_FRDP) {
 		if (csp_rdp_send(conn, packet, timeout) != CSP_ERR_NONE) {
@@ -329,6 +380,9 @@ int csp_send(csp_conn_t * conn, csp_packet_t * packet, uint32_t timeout) {
 #endif
 
 	ret = csp_send_direct(conn->idout, packet, timeout);
+
+	conn->in_send = 0;
+	conn->last_send_time = csp_get_ms();
 
 	return (ret == CSP_ERR_NONE) ? 1 : 0;
 

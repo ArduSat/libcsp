@@ -266,6 +266,25 @@ CSP_DEFINE_TASK(csp_task_router) {
 				packet->id.src, packet->id.dst, packet->id.dport,
 				packet->id.sport, packet->id.pri, packet->id.flags, packet->length);
 
+#if 0
+#ifdef __linux__
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		double sec = ts.tv_sec + ts.tv_nsec / 1e9;
+#else
+		double sec = (float)xTaskGetTickCount() / configTICK_RATE_HZ;
+#endif
+
+		printf("%.3f: packet contents (%d bytes):", sec,
+		    packet->length);
+
+		for (int i = 0; i < packet->length; i++) {
+		    if (i % 16 == 0) printf("\n");
+		    printf("%02x ", packet->data[i]);
+		}
+		printf("\n\n");
+#endif
+
 		/* Here there be promiscuous mode */
 #ifdef CSP_USE_PROMISC
 		csp_promisc_add(packet, csp_promisc_queue);
@@ -427,6 +446,8 @@ void csp_route_add_if(csp_iface_t *ifc) {
 		}
 	}
 
+	/* Initialize the estimated TX completion time */
+	ifc->tx_done_time = csp_get_ms();
 }
 
 int csp_route_set(uint8_t node, csp_iface_t *ifc, uint8_t nexthop_mac_addr) {

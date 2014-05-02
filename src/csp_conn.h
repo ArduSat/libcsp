@@ -69,6 +69,11 @@ typedef struct {
 	uint32_t ack_timeout;
 	uint32_t ack_delay_count;
 	uint32_t ack_timestamp;
+	uint32_t use_flow_control;
+	uint32_t cts;
+	int32_t simulate_loss_pct;
+	unsigned int simulate_loss_seed;
+	struct rdp_packet_s * retransmit_packet;
 	csp_bin_sem_handle_t tx_wait;
 	csp_queue_handle_t tx_queue;
 	csp_queue_handle_t rx_queue;
@@ -91,6 +96,8 @@ struct csp_conn_s {
 #ifdef CSP_USE_RDP
 	csp_rdp_t rdp;					/* RDP state */
 #endif
+	uint32_t in_send;				/* True if we're inside csp_send */
+	uint32_t last_send_time;		/* Time when csp_send was last called */
 };
 
 int csp_conn_lock(csp_conn_t * conn, uint32_t timeout);

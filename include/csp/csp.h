@@ -234,6 +234,9 @@ typedef struct csp_iface_s {
 	uint32_t txbytes;			/**< Transmitted bytes */
 	uint32_t rxbytes;			/**< Received bytes */
 	uint32_t irq;				/**< Interrupts */
+	uint32_t tx_done_time;		/**< Estimated time when all in-progress transmissions will be complete */
+	double tx_ms_per_byte;		/**< Estimated time to transmit one byte, not counting per-packet overhead */
+	double tx_ms_per_packet;	/**< Estimated per-packet overhead for all layers below CSP */
 	struct csp_iface_s *next;	/**< Next interface */
 } csp_iface_t;
 
@@ -629,6 +632,15 @@ void csp_uptime(uint8_t node, uint32_t timeout);
 void csp_rdp_set_opt(unsigned int window_size, unsigned int conn_timeout_ms,
 		unsigned int packet_timeout_ms, unsigned int delayed_acks,
 		unsigned int ack_timeout, unsigned int ack_delay_count);
+
+/**
+ * Configure simulated packet loss
+ * @param upstream_loss_pct Percentage of upstream packets to lose
+ * @param downstream_loss_pct Percentage of downstream packets to lose
+ * @param seed Seed for random number generation
+ */
+void csp_rdp_simulate_loss(unsigned int upstream_loss_pct,
+		unsigned int downstream_loss_pct, unsigned int seed);
 
 /**
  * Get RDP options

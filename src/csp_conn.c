@@ -247,6 +247,8 @@ csp_conn_t * csp_conn_new(csp_id_t idin, csp_id_t idout) {
 		conn->idin.ext = idin.ext;
 		conn->idout.ext = idout.ext;
 		conn->timestamp = csp_get_ms();
+		conn->in_send = 0;
+		conn->last_send_time = csp_get_ms();
 
 		/* Ensure connection queue is empty */
 		csp_conn_flush_rx_queue(conn);
