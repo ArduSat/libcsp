@@ -448,6 +448,20 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 			/* If not found, put back on tx queue */
 			csp_queue_enqueue(conn->rdp.tx_queue, &packet, 0);
 		} else {
+			/*
+			 * If our TX window is full, we can't free the retransmit
+			 * packet yet, because we won't have room to add a new
+			 * retransmit packet afterwards!
+			 *
+			 * This is inefficient, of course.  The right thing would
+			 * be to fix GomSpace's window size calculation -- it should
+			 * be based on the number of actual outstanding packets, not
+			 * the range of sequence numbers.
+			 */
+			uint16_t in_flight = conn->rdp.snd_nxt - conn->rdp.snd_una + 1;
+			if (conn->rdp.use_flow_control && in_flight > conn->rdp.window_size && packet == conn->rdp.retransmit_packet)
+				continue;
+
 			/* Found, free */
 			csp_log_protocol("TX Element %u freed\r\n", csp_ntoh16(header->seq_nr));
 			if (conn->rdp.retransmit_packet == packet) {
