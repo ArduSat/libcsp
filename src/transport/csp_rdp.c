@@ -60,6 +60,9 @@ static uint32_t csp_rdp_ack_delay_count = 4 / 2;
 static uint32_t csp_rdp_use_flow_control = 1;
 static uint32_t csp_rdp_close_wait_timeout = 500;
 
+static int32_t csp_rdp_simulate_packet_loss_pct = 30;
+static unsigned int csp_rdp_simulate_packet_loss_seed = 0;
+
 /* Used for queue calls */
 static CSP_BASE_TYPE pdTrue = 1;
 
@@ -658,6 +661,11 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			conn->rdp.state, rx_header->syn, rx_header->ack, rx_header->eak,
 			rx_header->rst, rx_header->nul, rx_header->cts, rx_header->seq_nr,
 			rx_header->ack_nr, packet->length, packet->length - sizeof(rdp_header_t));
+
+	if (rand_r(&csp_rdp_simulate_packet_loss_seed) % 100 < csp_rdp_simulate_packet_loss_pct) {
+		csp_log_error("RDP: Simulating loss of received packet\r\n");
+		return;
+	}
 
 	/* We received a CTS, so it's our turn to send */
 	if (rx_header->cts) {
