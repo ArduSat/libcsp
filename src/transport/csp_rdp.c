@@ -459,8 +459,11 @@ static void csp_rdp_flush_eack(csp_conn_t * conn, csp_packet_t * eack_packet) {
 			 * the range of sequence numbers.
 			 */
 			uint16_t in_flight = conn->rdp.snd_nxt - conn->rdp.snd_una + 1;
-			if (conn->rdp.use_flow_control && in_flight > conn->rdp.window_size && packet == conn->rdp.retransmit_packet)
+			if (conn->rdp.use_flow_control && in_flight > conn->rdp.window_size && packet == conn->rdp.retransmit_packet) {
+				printf("DEBUG: not freeing seqno %d\n", csp_ntoh16(header->seq_nr));
+				csp_queue_enqueue(conn->rdp.tx_queue, &packet, 0);
 				continue;
+			}
 
 			/* Found, free */
 			csp_log_protocol("TX Element %u freed\r\n", csp_ntoh16(header->seq_nr));
@@ -660,7 +663,8 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 	/* Wake user task if TX queue is ready for more data */
 	if (conn->rdp.state == RDP_OPEN)
 		if (csp_queue_size(conn->rdp.tx_queue) < (int)conn->rdp.window_size)
-			if (csp_rdp_seq_before(conn->rdp.snd_nxt - conn->rdp.snd_una, conn->rdp.window_size * 2))
+			//if (csp_rdp_seq_before(conn->rdp.snd_nxt - conn->rdp.snd_una, conn->rdp.window_size * 2))
+			if (conn->rdp.snd_nxt - conn->rdp.snd_una + 1 <= (int)conn->rdp.window_size)
 				if (conn->rdp.cts)
 					csp_bin_sem_post(&conn->rdp.tx_wait);
 
@@ -904,7 +908,6 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		if (rx_header->seq_nr != (uint16_t)(conn->rdp.rcv_cur + 1)) {
 			if (csp_rdp_rx_queue_add(conn, packet, rx_header->seq_nr) != CSP_QUEUE_OK) {
 				csp_log_protocol("Duplicate sequence number\r\n");
-				goto discard_open;
 			}
 			csp_rdp_send_eack(conn);
 			goto accepted_open;
