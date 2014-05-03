@@ -215,8 +215,10 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 	 * is set, we've queued the packet and we'll retry it later;
 	 * if not, just discard it.
 	 */
-	if (!conn->rdp.cts)
+	if (!conn->rdp.cts) {
+		csp_buffer_free(packet);
 		return CSP_ERR_BUSY;
+	}
 
 	/* After sending a CTS segment, it's no longer our turn to transmit */
 	if (header->cts)
@@ -327,6 +329,12 @@ static inline int csp_rdp_receive_data(csp_conn_t * conn, csp_packet_t * packet)
 
 	/* Remove RDP header before passing to userspace */
 	csp_rdp_header_remove(packet);
+
+	/* If it's a NUL segment, discard it */
+	if (packet->length == 0) {
+		csp_buffer_free(packet);
+		return CSP_ERR_NONE;
+	}
 
 	/* Enqueue data */
 	if (csp_conn_enqueue_packet(conn, packet) < 0) {
@@ -674,6 +682,8 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 
 void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 
+	int wake_tx_task = 0;
+
 	/* Get RX header and convert to host byte-order */
 	rdp_header_t * rx_header = csp_rdp_header_ref(packet);
 	rx_header->ack_nr = csp_ntoh16(rx_header->ack_nr);
@@ -686,9 +696,8 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			rx_header->ack_nr, packet->length, packet->length - sizeof(rdp_header_t));
 
 	if (rand_r(&conn->rdp.simulate_loss_seed) % 100 < conn->rdp.simulate_loss_pct) {
-		csp_log_error("RDP: Simulating loss of received packet\r\n");
-		csp_buffer_free(packet);
-		return;
+		csp_log_warn("RDP: Simulating loss of received packet\r\n");
+		goto discard_open;
 	}
 
 	/* We received a CTS, so it's our turn to send */
@@ -704,9 +713,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			csp_log_protocol("RDP: Got redundant CTS\r\n");
 
 		conn->rdp.cts = 1;
-
-		/* Wake up the TX task */
-		csp_bin_sem_post(&conn->rdp.tx_wait);
+		wake_tx_task = 1;
 	}
 
 	/* If a RESET was received. */
@@ -719,9 +726,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 
 		if (conn->rdp.state == RDP_CLOSE_WAIT || conn->rdp.state == RDP_CLOSED) {
 			csp_log_protocol("RST received in CLOSE_WAIT or CLOSED. Now closing connection\r\n");
-			csp_buffer_free(packet);
-			csp_close(conn);
-			return;
+			goto discard_close;
 		} else {
 			csp_log_protocol("Got RESET in state %u\r\n", conn->rdp.state);
 
@@ -919,18 +924,16 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		/* Store sequence number before stripping RDP header */
 		uint16_t seq_nr = rx_header->seq_nr;
 
-		/* Receive data, unless it's a NUL segment */
-		if (!rx_header->nul) {
-			if (csp_rdp_receive_data(conn, packet) != CSP_ERR_NONE)
-				goto discard_open;
-		}
-
 		/* Update last received packet */
 		conn->rdp.rcv_cur = seq_nr;
 
 		/* The message is in sequence */
 		int rxq = csp_conn_get_rxq(packet->id.pri);
 		int rx_queue_size = csp_queue_size(conn->rx_queue[rxq]);
+
+		/* Receive data -- note that this consumes packet! */
+		if (csp_rdp_receive_data(conn, packet) != CSP_ERR_NONE)
+			goto discard_open;
 
 		/* Only ACK the message if there is room for a full window in the RX buffer.
 		 * Unacknowledged segments are ACKed by csp_rdp_check_timeouts when the buffer is
@@ -991,6 +994,9 @@ discard_close:
 discard_open:
 	csp_buffer_free(packet);
 accepted_open:
+	if (wake_tx_task)
+		csp_bin_sem_post(&conn->rdp.tx_wait);
+
 	return;
 
 }
