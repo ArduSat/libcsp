@@ -215,8 +215,10 @@ static int csp_rdp_send_cmp(csp_conn_t * conn, csp_packet_t * packet, int flags,
 	 * is set, we've queued the packet and we'll retry it later;
 	 * if not, just discard it.
 	 */
-	if (!conn->rdp.cts)
+	if (!conn->rdp.cts) {
+		csp_buffer_free(packet);
 		return CSP_ERR_BUSY;
+	}
 
 	/* After sending a CTS segment, it's no longer our turn to transmit */
 	if (header->cts)
