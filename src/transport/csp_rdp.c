@@ -330,6 +330,12 @@ static inline int csp_rdp_receive_data(csp_conn_t * conn, csp_packet_t * packet)
 	/* Remove RDP header before passing to userspace */
 	csp_rdp_header_remove(packet);
 
+	/* If it's a NUL segment, discard it */
+	if (packet->length == 0) {
+		csp_buffer_free(packet);
+		return CSP_ERR_NONE;
+	}
+
 	/* Enqueue data */
 	if (csp_conn_enqueue_packet(conn, packet) < 0) {
 		csp_log_warn("Conn RX buffer full\r\n");
@@ -918,18 +924,16 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 		/* Store sequence number before stripping RDP header */
 		uint16_t seq_nr = rx_header->seq_nr;
 
-		/* Receive data, unless it's a NUL segment */
-		if (!rx_header->nul) {
-			if (csp_rdp_receive_data(conn, packet) != CSP_ERR_NONE)
-				goto discard_open;
-		}
-
 		/* Update last received packet */
 		conn->rdp.rcv_cur = seq_nr;
 
 		/* The message is in sequence */
 		int rxq = csp_conn_get_rxq(packet->id.pri);
 		int rx_queue_size = csp_queue_size(conn->rx_queue[rxq]);
+
+		/* Receive data -- note that this consumes packet! */
+		if (csp_rdp_receive_data(conn, packet) != CSP_ERR_NONE)
+			goto discard_open;
 
 		/* Only ACK the message if there is room for a full window in the RX buffer.
 		 * Unacknowledged segments are ACKed by csp_rdp_check_timeouts when the buffer is
