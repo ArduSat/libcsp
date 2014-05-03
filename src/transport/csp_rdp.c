@@ -674,6 +674,8 @@ void csp_rdp_check_timeouts(csp_conn_t * conn) {
 
 void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 
+	int wake_tx_task = 0;
+
 	/* Get RX header and convert to host byte-order */
 	rdp_header_t * rx_header = csp_rdp_header_ref(packet);
 	rx_header->ack_nr = csp_ntoh16(rx_header->ack_nr);
@@ -686,9 +688,8 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			rx_header->ack_nr, packet->length, packet->length - sizeof(rdp_header_t));
 
 	if (rand_r(&conn->rdp.simulate_loss_seed) % 100 < conn->rdp.simulate_loss_pct) {
-		csp_log_error("RDP: Simulating loss of received packet\r\n");
-		csp_buffer_free(packet);
-		return;
+		csp_log_warn("RDP: Simulating loss of received packet\r\n");
+		goto discard_open;
 	}
 
 	/* We received a CTS, so it's our turn to send */
@@ -704,9 +705,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 			csp_log_protocol("RDP: Got redundant CTS\r\n");
 
 		conn->rdp.cts = 1;
-
-		/* Wake up the TX task */
-		csp_bin_sem_post(&conn->rdp.tx_wait);
+		wake_tx_task = 1;
 	}
 
 	/* If a RESET was received. */
@@ -719,9 +718,7 @@ void csp_rdp_new_packet(csp_conn_t * conn, csp_packet_t * packet) {
 
 		if (conn->rdp.state == RDP_CLOSE_WAIT || conn->rdp.state == RDP_CLOSED) {
 			csp_log_protocol("RST received in CLOSE_WAIT or CLOSED. Now closing connection\r\n");
-			csp_buffer_free(packet);
-			csp_close(conn);
-			return;
+			goto discard_close;
 		} else {
 			csp_log_protocol("Got RESET in state %u\r\n", conn->rdp.state);
 
@@ -991,6 +988,9 @@ discard_close:
 discard_open:
 	csp_buffer_free(packet);
 accepted_open:
+	if (wake_tx_task)
+		csp_bin_sem_post(&conn->rdp.tx_wait);
+
 	return;
 
 }
