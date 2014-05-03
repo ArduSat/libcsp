@@ -137,7 +137,7 @@ csp_socket_t * csp_socket(uint32_t opts) {
 #endif
 
 	/* Drop packet if reserved flags are set */
-	if (opts & ~(CSP_SO_RDPREQ | CSP_SO_XTEAREQ | CSP_SO_HMACREQ | CSP_SO_CRC32REQ | CSP_SO_CONN_LESS)) {
+	if (opts & ~(CSP_SO_RDPREQ | CSP_SO_XTEAREQ | CSP_SO_HMACREQ | CSP_SO_CRC32REQ | CSP_SO_CONN_LESS | CSP_SO_HMACPROHIB | CSP_SO_XTEAPROHIB)) {
 		csp_log_error("Invalid socket option\r\n");
 		return NULL;
 	}

@@ -86,6 +86,10 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * interf
 
 	/* XTEA encrypted packet */
 	if (packet->id.flags & CSP_FXTEA) {
+		if (security_opts & CSP_SO_XTEAPROHIB) {
+			csp_log_error("Received packet with XTEA encryption, but XTEA encryption prohibited on socket");
+			return CSP_ERR_XTEA;
+		}
 #ifdef CSP_USE_XTEA
 		/* Read nonce */
 		uint32_t nonce;
@@ -137,6 +141,10 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * interf
 
 	/* HMAC authenticated packet */
 	if (packet->id.flags & CSP_FHMAC) {
+		if (security_opts & CSP_SO_HMACPROHIB) {
+			csp_log_error("Received packet with HMAC, but HMAC prohibited on socket");
+			return CSP_ERR_HMAC;
+		}
 #ifdef CSP_USE_HMAC
 		/* Verify HMAC */
 		if (csp_hmac_verify(packet) != 0) {
