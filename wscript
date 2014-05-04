@@ -254,8 +254,8 @@ def configure(ctx):
 		print "Are you flashing for flight?"
 
 	# Configure defaults for CSP flags
-	csp_o_default  = "CSP_O_NONE"
-	csp_so_default = "CSP_SO_NONE"
+	csp_o_default  = ctx.get_define('CSP_O_DEFAULT') or "CSP_O_NONE"
+	csp_so_default = ctx.get_define('CSP_SO_DEFAULT') or "CSP_SO_NONE"
 	if ctx.options.mandate_encryption:
 		csp_o_default += " | CSP_O_XTEA"
 		csp_so_default += " | CSP_SO_XTEAREQ"
