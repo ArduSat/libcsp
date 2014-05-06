@@ -149,7 +149,7 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * interf
 		/* Verify HMAC */
 		if (csp_hmac_verify(packet) != 0) {
 			/* HMAC failed */
-			csp_log_error("HMAC verification error! Discarding packet\r\n");
+			csp_log_error("HMAC verification error! Discarding packet (src: %u, dest: %u)\r\n", packet->id.src, packet->id.dst);
 			interface->autherr++;
 			return CSP_ERR_HMAC;
 		}
