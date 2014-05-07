@@ -108,7 +108,7 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * interf
 			return CSP_ERR_XTEA;
 		}
 	} else if (security_opts & CSP_SO_XTEAREQ) {
-		csp_log_warn("Received packet without XTEA encryption. Discarding packet\r\n");
+		csp_log_warn("Received packet without XTEA encryption from %u. Discarding packet\r\n", packet->id.src);
 		interface->autherr++;
 		return CSP_ERR_XTEA;
 #else
@@ -131,7 +131,7 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * interf
 			return CSP_ERR_CRC32;
 		}
 	} else if (security_opts & CSP_SO_CRC32REQ) {
-		csp_log_warn("Received packet without CRC32. Accepting packet\r\n");
+		csp_log_warn("Received packet without CRC32 from %u. Accepting packet\r\n", packet->id.src);
 #else
 		/* Strip CRC32 field and accept the packet */
 		csp_log_warn("Received packet with CRC32, but CSP was compiled without CRC32 support. Accepting packet\r\n");
@@ -154,7 +154,7 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * interf
 			return CSP_ERR_HMAC;
 		}
 	} else if (security_opts & CSP_SO_HMACREQ) {
-		csp_log_warn("Received packet without HMAC. Discarding packet\r\n");
+		csp_log_warn("Received packet without HMAC from %u. Discarding packet\r\n", packet->id.src);
 		interface->autherr++;
 		return CSP_ERR_HMAC;
 #else
