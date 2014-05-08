@@ -18,8 +18,6 @@
 #include <csp/interfaces/csp_if_astrodev.h>
 #include <csp/arch/csp_malloc.h>
 
-#include <csp/hacks/lithium.h>
-
 // To provide information to beacon for some of its algorithms.
 // Note: this gets reset externally.
 csp_id_t latest_csp_transfer_id[NUM_ASTRODEV_MODULES] = {{0x0},{0x0}};
@@ -92,12 +90,7 @@ void csp_astrodev_rx (csp_iface_t *interface,
         }
     }
 
-    //We need to remove the radio frame added by ardusatGround:gnu_radio.c:gnu_radio_tx
-    radio_frame_t *radio_frame = (radio_frame_t *) buf;
-    buf = radio_frame->data;
-    len -= sizeof(radio_frame_t);
-
-    /* Remove trailing two bytes */ //TODO: Why?
+    /* Remove trailing two bytes */
     len -= (sizeof(uint8_t) * 2);
 
     packet = csp_buffer_get(interface->mtu);
