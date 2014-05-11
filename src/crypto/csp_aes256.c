@@ -48,7 +48,7 @@ typedef struct {
 #define AES256_BLOCKSIZE 16
 #define AES256_KEYLENGTH 32
 
-char * csp_aes256_key = AES256_ENCRYPTION_KEY;
+uint8_t csp_aes256_key[AES256_KEYLENGTH] = AES256_ENCRYPTION_KEY;
 
 // #define AES256_BACK_TO_TABLES
 #ifdef AES256_BACK_TO_TABLES
