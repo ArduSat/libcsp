@@ -212,15 +212,13 @@ def configure(ctx):
 	ctx.define_cond('AES256_BACK_TO_TABLES', not ctx.options.disable_aes256_table)
 	if ctx.options.aes256_key:
 		if not re.compile('^[^"]{32}$').match(ctx.options.aes256_key):
-			sys.exit('    ERROR: --aes256-key KEY: KEY must be 32-character string ([^"]{32})')
-		else:
-			ctx.define('AES256_ENCRYPTION_KEY', ctx.options.aes256_key, True)
+			print('    WARN: --aes256-key KEY: KEY must be 32-character string ([^"]{32})')
+		ctx.define('AES256_ENCRYPTION_KEY', ctx.options.aes256_key, True)
 
 	if ctx.options.hmac_key:
 		if not re.compile('^[^"]{16}$').match(ctx.options.hmac_key):
-			sys.exit('    ERROR: --hmac-key KEY: KEY must be 16-character string ([^"]{32})')
-		else:
-			ctx.define('HMAC_KEY', ctx.options.hmac_key, True)
+			print('    WARN: --hmac-key KEY: KEY must be 16-character string ([^"]{32})')
+		ctx.define('HMAC_KEY', ctx.options.hmac_key, True)
 
 	if ctx.options.aes256_key == DEVELOPMENT_AES256_KEY or ctx.options.hmac_key == DEVELOPMENT_HMAC_KEY:
 		print ""
