@@ -139,7 +139,7 @@ void csp_debug_toggle_level(csp_debug_level_t level);
  * @param level Level to set
  * @param value New level value
  */
-void csp_debug_set_level(csp_debug_level_t level, bool value);
+int csp_debug_set_level(csp_debug_level_t level, bool value);
 
 /**
  * Get current debug level value

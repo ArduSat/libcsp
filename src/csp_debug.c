@@ -119,10 +119,12 @@ void do_csp_debug(csp_debug_level_t level, const char * format, ...) {
 
 }
 
-void csp_debug_set_level(csp_debug_level_t level, bool value) {
+int csp_debug_set_level(csp_debug_level_t level, bool value) {
 	if (level > CSP_LOCK)
-		return;
+		return 0;
 	csp_debug_level_enabled[level] = value;
+
+	return 1;
 }
 
 int csp_debug_get_level(csp_debug_level_t level) {

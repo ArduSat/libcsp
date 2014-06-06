@@ -591,34 +591,34 @@ void csp_ping_noreply(uint8_t node);
  * @param node node id
  * @param timeout timeout in ms
  */
-void csp_ps(uint8_t node, uint32_t timeout);
+int csp_ps(uint8_t node, uint32_t timeout);
 
 /**
  * Request amount of free memory
  * @param node node id
  * @param timeout timeout in ms
  */
-void csp_memfree(uint8_t node, uint32_t timeout);
+int csp_memfree(uint8_t node, uint32_t timeout);
 
 /**
  * Request number of free buffer elements
  * @param node node id
  * @param timeout timeout in ms
  */
-void csp_buf_free(uint8_t node, uint32_t timeout);
+int csp_buf_free(uint8_t node, uint32_t timeout);
 
 /**
  * Reboot subsystem
  * @param node node id
  */
-void csp_reboot(uint8_t node);
+int csp_reboot(uint8_t node);
 
 /**
  * Request subsystem uptime
  * @param node node id
  * @param timeout timeout in ms
  */
-void csp_uptime(uint8_t node, uint32_t timeout);
+int csp_uptime(uint8_t node, uint32_t timeout);
 
 /**
  * Set RDP options

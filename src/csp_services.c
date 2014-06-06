@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <csp/csp.h>
 #include <csp/csp_cmp.h>
 #include <csp/csp_endian.h>
-
+#include <csp/csp_error.h>
 #include <csp/arch/csp_time.h>
 
 int csp_ping(uint8_t node, uint32_t timeout, unsigned int size, uint8_t conn_options) {
@@ -128,39 +128,44 @@ void csp_ping_noreply(uint8_t node) {
 
 }
 
-void csp_reboot(uint8_t node) {
+int csp_reboot(uint8_t node) {
 	uint32_t magic_word = csp_hton32(0x80078007);
-	csp_transaction(CSP_PRIO_NORM, node, CSP_REBOOT, 0, &magic_word, sizeof(magic_word), NULL, 0);
+	return csp_transaction(CSP_PRIO_NORM, node, CSP_REBOOT, 0, &magic_word, sizeof(magic_word), NULL, 0);
 }
 
-void csp_ps(uint8_t node, uint32_t timeout) {
+int csp_ps(uint8_t node, uint32_t timeout) {
+	int error = 1;
 
 	/* Open connection */
 	csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, node, CSP_PS, 0, csp_o_base_flags);
 	if (conn == NULL)
-		return;
+		return 0;
 
 	/* Prepare data */
 	csp_packet_t * packet;
 	packet = csp_buffer_get(95);
 
 	/* Check malloc */
-	if (packet == NULL)
+	if (packet == NULL){
+		error = 0;
 		goto out;
-
+	}
+	
 	packet->data[0] = 0x55;
 	packet->length = 1;
 
 	printf("PS node %"PRIu8": ", node);
 
 	/* Try to send frame */
-	if (!csp_send(conn, packet, 0))
+	if (!csp_send(conn, packet, 0)){
+		error = 0;
 		goto out;
-
+	}
 	/* Read incoming frame */
 	packet = csp_read(conn, timeout);
 	if (packet == NULL) {
 		printf(" Timeout!\r\n");
+		error = 0;
 		goto out;
 	}
 
@@ -173,52 +178,57 @@ out:
 	if (packet != NULL)
 		csp_buffer_free(packet);
 	csp_close(conn);
-
+	
+	return error;
 }
 
-void csp_memfree(uint8_t node, uint32_t timeout) {
+int csp_memfree(uint8_t node, uint32_t timeout) {
 
 	uint32_t memfree;
 
 	int status = csp_transaction(CSP_PRIO_NORM, node, CSP_MEMFREE, timeout, NULL, 0, &memfree, sizeof(memfree));
 	if (status == 0) {
 		printf("Network error\r\n");
-		return;
+		return status;
 	}
 
 	/* Convert from network to host order */
 	memfree = csp_ntoh32(memfree);
 
 	printf("Free Memory at node %"PRIu8" is %"PRIu32" bytes\r\n", node, memfree);
-
+	
+	return status;
 }
 
-void csp_buf_free(uint8_t node, uint32_t timeout) {
+int csp_buf_free(uint8_t node, uint32_t timeout) {
 
 	uint32_t size = 0;
 
 	int status = csp_transaction(CSP_PRIO_NORM, node, CSP_BUF_FREE, timeout, NULL, 0, &size, sizeof(size));
-	if (status == 0) {
+	
+	if (status == 0){
 		printf("Network error\r\n");
-		return;
+		return status;
 	}
 	size = csp_ntoh32(size);
 	printf("Free buffers at node %"PRIu8" is %"PRIu32"\r\n", node, size);
 
+	return status;
 }
 
-void csp_uptime(uint8_t node, uint32_t timeout) {
+int csp_uptime(uint8_t node, uint32_t timeout) {
 
 	uint32_t uptime = 0;
 
 	int status = csp_transaction(CSP_PRIO_NORM, node, CSP_UPTIME, timeout, NULL, 0, &uptime, sizeof(uptime));
 	if (status == 0) {
 		printf("Network error\r\n");
-		return;
+		return status;
 	}
 	uptime = csp_ntoh32(uptime);
 	printf("Uptime of node %"PRIu8" is %"PRIu32" s\r\n", node, uptime);
 
+	return status;
 }
 
 int csp_cmp(uint8_t node, uint32_t timeout, uint8_t code, int membsize, struct csp_cmp_message * msg) {
