@@ -217,9 +217,9 @@ typedef struct __attribute__((__packed__)) {
  * Packet for CSP_GET_ROUTE
  * Used to return data from node on it's routing information
  */ 
-typedef struct __attribute__((packed__)) {
+typedef struct __attribute__((__packed__)) {
         uint8_t node;
-        uint8_t name_buffer[10];                /**<Buffer for interface name (10 bytes may be too generous */
+        uint8_t name_buffer[10];                /**<Buffer for interface name, 10 bytes may be too generous */
         uint8_t nexthop_mac_addr;
 } csp_route_info; 
         

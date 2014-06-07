@@ -234,16 +234,16 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
 
         case CSP_GET_ROUTE: {//will return node, interface name, and nexthop_mac_addr for five routes, starting with index pointed to in packet->data
                 csp_route_info return_info[5];
-                memset(return_info, NULL, sizeof(return_info));
-                if(packet->length >= CSP_ROUTE_COUNT + 5){//if we commanded to read past max index (CSP_ROUTE_COUNT) of routes, will avoid that
+                memset(&return_info, NULL, sizeof(return_info));
+                if(packet->length >= (CSP_ROUTE_COUNT + )5){//if we commanded to read past max index (CSP_ROUTE_COUNT) of routes, will avoid that
                     csp_buffer_free(packet);
                     return;
                 }
                 uint16_t i; 
                 for(i = 0; i<5; i++){
-                    csp_route_info[i].node = packet->length+i;//may be confused as to what node should be, this'll work for now, but stupid (of course)
-                    strcpy(csp_route_info[i].name_buffer,routes[packet->length+i].interface->name);
-                    csp_route_info[i].nexthop_mac_addr = routes[packet->length+i].nexthop_mac_addr;
+                    return_info[i].node = packet->length+i;//may be confused as to what node should be, this'll work for now, but stupid (of course)
+                    strcpy(return_info[i].name_buffer,routes[packet->length+i].interface->name);
+                    return_info[i].nexthop_mac_addr = routes[packet->length+i].nexthop_mac_addr;
                  }
                 packet->length = sizeof(return_info);
                 memcpy(packet->data, return_info, sizeof(return_info));               
