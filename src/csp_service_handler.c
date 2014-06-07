@@ -233,6 +233,9 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
 	}
 
         case CSP_GET_ROUTE: {//will return node, interface name, and nexthop_mac_addr for five routes, starting with index pointed to in packet->data
+                printf("What are my routes?\r\n");
+                csp_route_print_table();//debugging to see what device thinks it's routing info is
+
                 csp_route_info return_info[5];
                 csp_route_t route_entry;
                 uint8_t index;
