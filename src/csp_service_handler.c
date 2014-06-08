@@ -232,7 +232,7 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
 		break;
 	}
 
-        /**Returns name and address of 5 nodes, starting at
+        /**Returns name and address of 5 nodes, starting at                     //starts on column 81
            node pointed to by contents of packet->data
         */
         case CSP_GET_ROUTE: {
@@ -249,14 +249,20 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                 } 
                 for(i = 0; i<5; i++){
                     if(i+index >= CSP_ROUTE_COUNT)
-                            break;
+                            break;//asking for route that doesn't exist
                     route_pointer = csp_route_struct(i+index);
-                    if(route_pointer != NULL){
+                    if((route_pointer != NULL) && ((i+index) != CSP_DEFAULT_ROUTE)){
                             strcpy(return_info[i].name_buffer,
                                    route_pointer->interface->name);
                             return_info[i].nexthop_mac_addr = 
                             route_pointer->nexthop_mac_addr == CSP_NODE_MAC ? 
                             (i+index) : route_pointer->nexthop_mac_addr;
+                    }
+                    else if((route_pointer != NULL) && ((i+index) == CSP_DEFAULT_ROUTE)){
+                            strcpy(return_info[i].name_buffer,
+                                   route_pointer->interface->name);
+                            return_info[i].nexthop_mac_addr = 
+                            route_pointer->nexthop_mac_addr;
                     }
                 }
                 packet->length = sizeof(return_info);
