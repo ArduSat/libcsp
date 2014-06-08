@@ -506,6 +506,15 @@ csp_route_t * csp_route_if(uint8_t id) {
 
 }
 
+csp_route_t * csp_route_struct(uint8_t id) {
+
+        if (routes[id].interface != NULL) {
+                return &routes[id];
+        } else return NULL;
+
+}
+
+
 int csp_route_enqueue(csp_queue_handle_t handle, void * value, uint32_t timeout, CSP_BASE_TYPE * pxTaskWoken) {
 
 	int result;

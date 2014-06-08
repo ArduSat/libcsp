@@ -234,6 +234,7 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
 
         case CSP_GET_ROUTE: {//will return node, interface name, and nexthop_mac_addr for five routes, starting with index pointed to in packet->data
                 csp_route_info return_info[5];
+                csp_route_t * route_pointer;
                 csp_route_t route_entry;
                 uint8_t i, index;
                 memcpy(&index, packet->data, sizeof(index));
@@ -241,6 +242,7 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                 memset(return_info, 0x00, sizeof(return_info));
                 
                 if(index == 0){
+                    printf("CSP_ROUTE_COUNT: %u, CSP_DEFAULT_ROUTE, %u\r\n",CSP_ROUTE_COUNT, CSP_DEFAULT_ROUTE);
                     printf("passed index: %2X, %u\r\n",index,index);
                     printf("What are my routes?\r\n");
                     csp_route_print_table();//debugging to see what device thinks it's routing info is
@@ -252,11 +254,14 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                     printf("Curse you for your inevitable betrayal! (reading beyond routes)\r\n");
                     return;
                 } 
-                for(i = 0; i<5; i++){                     
-                    memcpy(&route_entry, csp_route_if(i+index), sizeof(route_entry));
-                    return_info[i].node = i+index;//confused as to what node should be, this'll work for now, but sort of useless
-                    strcpy(return_info[i].name_buffer,route_entry.interface->name);
-                    return_info[i].nexthop_mac_addr = route_entry.nexthop_mac_addr == CSP_NODE_MAC ? (i+index) : route_entry.nexthop_mac_addr;
+                for(i = 0; i<5; i++){
+                    route_pointer = csp_route_struct(i+index);
+                    if(route_pointer != NULL){
+                        memcpy(&route_entry, route_pointer, sizeof(route_entry));
+                        return_info[i].node = i+index;//confused as to what node should be, this'll work for now, but sort of useless
+                        strcpy(return_info[i].name_buffer,route_entry.interface->name);
+                        return_info[i].nexthop_mac_addr = route_entry.nexthop_mac_addr == CSP_NODE_MAC ? (i+index) : route_entry.nexthop_mac_addr;
+                    }
                 }
                 packet->length = sizeof(return_info);
                 memcpy(packet->data, return_info, sizeof(return_info));               

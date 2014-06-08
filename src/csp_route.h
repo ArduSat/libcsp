@@ -48,6 +48,17 @@ int csp_route_table_init(void);
  */
 csp_route_t * csp_route_if(uint8_t id);
 
+
+
+/**
+ * Routing table lookup
+ * This is the actual lookup in the routing table
+ * The table consists of one entry per possible node
+ * Unlike above function, it returns NULL if no explicit
+ * nexthop route for the destination
+ */
+csp_route_t * csp_route_struct(uint8_t id);
+
 /**
  * Interface lookup by name
  * @param name NUL terminated interface name
