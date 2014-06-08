@@ -646,15 +646,17 @@ void csp_route_print_table(void) {
 }
 uint8_t csp_route_print_remote_table(uint8_t node) {                               //this comment starts at 81
 //ask for and print routing table of specified node
-        csp_route_info returned_route_info[5];
-        uint8_t i = 0;//used to indicate which five nodes we want
+        csp_route_info returned_routes[5];
+        int status;
+        uint32_t timeout = 5000;//not sure what this should default to
+        uint8_t k,i = 0;
         printf("Routing table for %u\r\n",node);
         printf("Node Interface Address\r\n");
         while(1){//ask for and print 5 nodes at a time
-                memset(returned_route_info,0x00,sizeof(returned_route_info));
+                memset(returned_routes,0x00,sizeof(returned_routes));
                 status = csp_transaction(CSP_PRIO_NORM,node,CSP_GET_ROUTE
-                ,timeout,&i,sizeof(i),returned_route_info
-                ,sizeof(returned_route_info));
+                ,timeout,&i,sizeof(i),returned_routes
+                ,sizeof(returned_routes));
                 if(status == 0){
                         printf("Error or incoming length wrong\r\n");
                         return CSP_ERR_TX;
@@ -667,29 +669,21 @@ uint8_t csp_route_print_remote_table(uint8_t node) {                            
                         if((i+k) > CSP_ROUTE_COUNT)
                                 goto out_of_nodes;
                         //no route if name_buffer NULL
-                        if(returned_route_info[k].name_buffer[0] != 0x00) {
+                        if(returned_routes[k].name_buffer[0] != 0x00) {
                                 if((i+k) != CSP_DEFAULT_ROUTE){
                                         printf("%4u %-9s %u\r\n",(i+k)
-                                        ,returned_route_info[k].name_buffer
-                                        ,returned_route_info[k].nexthop_mac_addr);
+                                        ,returned_routes[k].name_buffer
+                                        ,returned_routes[k].nexthop_mac_addr);
                                 }
                                 else printf("  *  %-9s %u\r\n", 
-                                     returned_route_info[k].name_buffer, 
-                                     returned_route_info[k].nexthop_mac_addr);
+                                     returned_routes[k].name_buffer, 
+                                     returned_routes[k].nexthop_mac_addr);
                         }
                 }
                 i += 5;
         }
         out_of_nodes:
-        return CMD_ERROR_NONE:
-}
-
-
-
-
-
-
-
+        return CSP_ERR_NONE;
 }
 #endif
 

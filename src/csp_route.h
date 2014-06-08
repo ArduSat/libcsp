@@ -32,6 +32,7 @@ extern "C" {
 #include <csp/arch/csp_thread.h>
 #include <csp/arch/csp_queue.h>
 
+#include <csp/csp_error.h>
 
 /**
  * csp_route_table_init
