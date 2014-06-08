@@ -237,10 +237,11 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                 csp_route_t route_entry;
                 uint8_t i, index;
                 memcpy(&index, packet->data, sizeof(index));
-                printf("passed index: %u\r\n",index);
+                printf("passed index: %u\r\n",index);//FINE
                 memset(return_info, 0x00, sizeof(return_info));
                 
                 if(index == 0){
+                    printf("passed index: %2X, %u\r\n",index,index);
                     printf("What are my routes?\r\n");
                     csp_route_print_table();//debugging to see what device thinks it's routing info is
                     printf("Those were my routes\r\n");
