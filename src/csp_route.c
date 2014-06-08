@@ -644,18 +644,20 @@ void csp_route_print_table(void) {
 	routes[CSP_DEFAULT_ROUTE].nexthop_mac_addr);
 
 }
-int8_t csp_route_print_remote_table(uint8_t node) {                               //this comment starts at 81
-//ask for and print routing table of specified node
-        csp_route_info returned_routes[5];
+int8_t csp_route_print_remote_table(uint8_t node, uint8_t nodes_requested) {
+        csp_route_info returned_routes[nodes_requested];
         int status;
         uint32_t timeout = 2000;//not sure what this should default to
         uint8_t k,i = 0;
+        uint8_t params[2];
         printf("Routing table for %u\r\n",node);
         printf("Node Interface Address\r\n");
         while(1){//ask for and print 5 nodes at a time
+                params[0] = i;
+                params[1] = nodes_requested;
                 memset(returned_routes,0x00,sizeof(returned_routes));
                 status = csp_transaction(CSP_PRIO_NORM,node,CSP_GET_ROUTE
-                ,timeout,&i,sizeof(i),returned_routes
+                ,timeout,&params[0],sizeof(params),returned_routes
                 ,sizeof(returned_routes));
                 if(status == 0){
                         printf("Error or incoming length wrong\r\n");
@@ -665,7 +667,7 @@ int8_t csp_route_print_remote_table(uint8_t node) {                             
                         printf("Error: timeout in csp_transaction\r\n");
                         return CSP_ERR_TIMEDOUT;
                 }
-                for(k = 0; k < 5; k++){
+                for(k = 0; k < nodes_requested; k++){
                         if((i+k) > CSP_ROUTE_COUNT)
                                 goto out_of_nodes;
                         //no route if name_buffer NULL
@@ -680,7 +682,7 @@ int8_t csp_route_print_remote_table(uint8_t node) {                             
                                      returned_routes[k].nexthop_mac_addr);
                         }
                 }
-                i += 5;
+                i += nodes_requested;
         }
         out_of_nodes:
         return CSP_ERR_NONE;

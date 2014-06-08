@@ -232,14 +232,18 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
 		break;
 	}
 
-        /**Returns name and address of 5 nodes, starting at                     //starts on column 81
-           node pointed to by contents of packet->data
+        /**Returns name and address of nodes from route table.
+         * First parameter is index of table to start at, and
+         * second parameter is number of indeces to return 
         */
         case CSP_GET_ROUTE: {
-                csp_route_info return_info[5];
                 csp_route_t * route_pointer;
-                uint8_t i, index;
-                memcpy(&index, packet->data, sizeof(index));
+                uint8_t i, index, nodes_requested;
+                uint8_t params[2];
+                memcpy(&params[0], packet->data, sizeof(params));
+                index = params[0];
+                nodes_requested = params[1];
+                csp_route_info return_info[nodes_requested];
                 memset(return_info, 0x00, sizeof(return_info));
                 //don't attempt to read beyond size of routes array
                 if(index >= (CSP_ROUTE_COUNT)){
@@ -247,7 +251,7 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                         printf("CSP_GET_ROUTE: won't read past array\r\n");
                         return;
                 } 
-                for(i = 0; i<5; i++){
+                for(i = 0; i < nodes_requested; i++){
                     if(i+index >= CSP_ROUTE_COUNT)
                             break;//asking for route that doesn't exist
                     route_pointer = csp_route_struct(i+index);

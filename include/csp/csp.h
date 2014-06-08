@@ -697,7 +697,7 @@ void csp_route_print_table(void);
 /**
  * Prints remote routing table
  */
-int8_t csp_route_print_remote_table(uint8_t node);
+int8_t csp_route_print_remote_table(uint8_t node, uint8_t nodes_requested);
 
 /**
  * Print connection table
