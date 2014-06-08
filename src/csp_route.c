@@ -644,11 +644,11 @@ void csp_route_print_table(void) {
 	routes[CSP_DEFAULT_ROUTE].nexthop_mac_addr);
 
 }
-uint8_t csp_route_print_remote_table(uint8_t node) {                               //this comment starts at 81
+int8_t csp_route_print_remote_table(uint8_t node) {                               //this comment starts at 81
 //ask for and print routing table of specified node
         csp_route_info returned_routes[5];
         int status;
-        uint32_t timeout = 5000;//not sure what this should default to
+        uint32_t timeout = 2000;//not sure what this should default to
         uint8_t k,i = 0;
         printf("Routing table for %u\r\n",node);
         printf("Node Interface Address\r\n");
