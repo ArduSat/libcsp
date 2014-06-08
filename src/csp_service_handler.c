@@ -232,39 +232,31 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
 		break;
 	}
 
-        case CSP_GET_ROUTE: {//will return node, interface name, and nexthop_mac_addr for five routes, starting with index pointed to in packet->data
+        /**Returns name and address of 5 nodes, starting at
+           node pointed to by contents of packet->data
+        */
+        case CSP_GET_ROUTE: {
                 csp_route_info return_info[5];
                 csp_route_t * route_pointer;
-                csp_route_t route_entry;
                 uint8_t i, index;
                 memcpy(&index, packet->data, sizeof(index));
-                printf("passed index: %u\r\n",index);//FINE
                 memset(return_info, 0x00, sizeof(return_info));
-                
-                if(index == 0){
-                    printf("CSP_ROUTE_COUNT: %u, CSP_DEFAULT_ROUTE, %u\r\n",CSP_ROUTE_COUNT, CSP_DEFAULT_ROUTE);
-                    printf("passed index: %2X, %u\r\n",index,index);
-                    printf("What are my routes?\r\n");
-                    csp_route_print_table();//debugging to see what device thinks it's routing info is
-                    printf("Those were my routes\r\n");
-                }
-
-                if(index >= (CSP_ROUTE_COUNT)){//if we cre ommanded to read past max index (CSP_ROUTE_COUNT) of routes, will avoid that
-                    csp_buffer_free(packet);
-                    printf("Curse you for your inevitable betrayal! (reading beyond routes)\r\n");
-                    return;
+                //don't attempt to read beyond size of routes array
+                if(index >= (CSP_ROUTE_COUNT)){
+                        csp_buffer_free(packet);
+                        printf("CSP_GET_ROUTE: won't read past array\r\n");
+                        return;
                 } 
                 for(i = 0; i<5; i++){
                     if(i+index > CSP_ROUTE_COUNT)
-                        break;
-                    else {
-                        route_pointer = csp_route_struct(i+index);
-                        if(route_pointer != NULL){
-                            memcpy(&route_entry, route_pointer, sizeof(route_entry));
-                            return_info[i].node = i+index;//confused as to what node should be, this'll work for now, but sort of useless
-                            strcpy(return_info[i].name_buffer,route_entry.interface->name);
-                            return_info[i].nexthop_mac_addr = route_entry.nexthop_mac_addr == CSP_NODE_MAC ? (i+index) : route_entry.nexthop_mac_addr;
-                        }
+                            break;
+                    route_pointer = csp_route_struct(i+index);
+                    if(route_pointer != NULL){
+                            strcpy(return_info[i].name_buffer,
+                                   route_pointer->interface->name);
+                            return_info[i].nexthop_mac_addr = 
+                            route_pointer->nexthop_mac_addr == CSP_NODE_MAC ? 
+                            (i+index) : route_pointer->nexthop_mac_addr;
                     }
                 }
                 packet->length = sizeof(return_info);
