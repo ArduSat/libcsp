@@ -56,7 +56,7 @@ csp_route_t * csp_route_if(uint8_t id);
 csp_iface_t * csp_route_get_if_by_name(char *name);
 
 
-uint8_t csp_route_get_nexthop_mac(uint8_t node);
+//uint8_t csp_route_get_nexthop_mac(uint8_t node);
 
 
 

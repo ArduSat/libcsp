@@ -252,10 +252,10 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                     return;
                 } 
                 for(i = 0; i<5; i++){                     
-                memcpy(&route_entry, csp_route_if(i+index), sizeof(route_entry));
-                return_info[i].node = i+index;//confused as to what node should be, this'll work for now, but sort of useless
-                strcpy(return_info[i].name_buffer,route_entry.interface->name);
-                return_info[i].nexthop_mac_addr = csp_route_get_nexthop_mac(i+index) == CSP_NODE_MAC ? (i+index) : csp_route_get_nexthop_mac(i+index);;
+                    memcpy(&route_entry, csp_route_if(i+index), sizeof(route_entry));
+                    return_info[i].node = i+index;//confused as to what node should be, this'll work for now, but sort of useless
+                    strcpy(return_info[i].name_buffer,route_entry.interface->name);
+                    return_info[i].nexthop_mac_addr = route_entry.nexthop_mac_addr == CSP_NODE_MAC ? (i+index) : route_entry.nexthop_mac_addr;
                 }
                 packet->length = sizeof(return_info);
                 memcpy(packet->data, return_info, sizeof(return_info));               
