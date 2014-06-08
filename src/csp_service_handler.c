@@ -233,7 +233,7 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
 	}
 
         case CSP_GET_ROUTE: {//will return node, interface name, and nexthop_mac_addr for five routes, starting with index pointed to in packet->data
-                csp_route_info return_info[5];
+                csp_route_info return_info[11];
                 csp_route_t * route_pointer;
                 csp_route_t route_entry;
                 uint8_t i, index;
@@ -249,12 +249,12 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                     printf("Those were my routes\r\n");
                 }
 
-                if(index >= (CSP_ROUTE_COUNT - 5)){//if we cre ommanded to read past max index (CSP_ROUTE_COUNT) of routes, will avoid that
+                if(index >= (CSP_ROUTE_COUNT - 11)){//if we cre ommanded to read past max index (CSP_ROUTE_COUNT) of routes, will avoid that
                     csp_buffer_free(packet);
                     printf("Curse you for your inevitable betrayal! (reading beyond routes)\r\n");
                     return;
                 } 
-                for(i = 0; i<5; i++){
+                for(i = 0; i<11; i++){
                     route_pointer = csp_route_struct(i+index);
                     if(route_pointer != NULL){
                         memcpy(&route_entry, route_pointer, sizeof(route_entry));
