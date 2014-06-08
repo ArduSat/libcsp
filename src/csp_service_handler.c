@@ -248,7 +248,7 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                         return;
                 } 
                 for(i = 0; i<5; i++){
-                    if(i+index > CSP_ROUTE_COUNT)
+                    if(i+index >= CSP_ROUTE_COUNT)
                             break;
                     route_pointer = csp_route_struct(i+index);
                     if(route_pointer != NULL){
