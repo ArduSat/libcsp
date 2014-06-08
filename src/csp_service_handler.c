@@ -238,14 +238,15 @@ void csp_service_handler(csp_conn_t * conn, csp_packet_t * packet) {
                 printf("Those were my routes\r\n");
                 csp_route_info return_info[5];
                 csp_route_t route_entry;
-                uint8_t index;
+                uint8_t i, index;
                 memcpy(&index, packet->data, sizeof(index));
+                printf("passed index: %u\r\n",index);
                 memset(return_info, 0x00, sizeof(return_info));
-                if(index >= (CSP_ROUTE_COUNT + 5)){//if we commanded to read past max index (CSP_ROUTE_COUNT) of routes, will avoid that
+                if(index >= (CSP_ROUTE_COUNT + 5)){//if we cre ommanded to read past max index (CSP_ROUTE_COUNT) of routes, will avoid that
                     csp_buffer_free(packet);
+                    printf("Curse you for your inevitable betrayal! (reading beyond routes)\r\n");
                     return;
-                }
-                uint16_t i; 
+                } 
                 for(i = 0; i<5; i++){                     
                 memcpy(&route_entry, csp_route_if(i+index), sizeof(route_entry));
                 return_info[i].node = i+index;//confused as to what node should be, this'll work for now, but sort of useless
