@@ -62,8 +62,9 @@ enum csp_reserved_ports_e {
 	CSP_PS			  	= 2,
 	CSP_MEMFREE		 	= 3,
 	CSP_REBOOT		  	= 4,
-	CSP_BUF_FREE		= 5,
+       	CSP_BUF_FREE                    = 5,
 	CSP_UPTIME			= 6,
+        CSP_GET_ROUTE                   = 7,
 	CSP_ANY			 	= (CSP_MAX_BIND_PORT + 1),
 	CSP_PROMISC		 	= (CSP_MAX_BIND_PORT + 2)
 };
@@ -211,6 +212,18 @@ typedef struct __attribute__((__packed__)) {
 		uint32_t data32[0];				/**< without the compiler warning about strict aliasing rules. */
 	};
 } csp_packet_t;
+
+/**
+ * Packet for CSP_GET_ROUTE
+ * Used to return data from node on it's routing information
+ */ 
+typedef struct __attribute__((__packed__)) {
+        uint8_t name_buffer[10];                /**<Buffer for interface name, 10 bytes may be too generous */
+        uint8_t nexthop_mac_addr;
+} csp_route_info; 
+        
+
+
 
 /** Interface TX function */
 struct csp_iface_s;
@@ -680,6 +693,11 @@ void csp_route_print_interfaces(void);
  * Print routing table
  */
 void csp_route_print_table(void);
+
+/**
+ * Prints remote routing table
+ */
+int8_t csp_route_print_remote_table(uint8_t node, uint8_t nodes_requested);
 
 /**
  * Print connection table

@@ -506,6 +506,15 @@ csp_route_t * csp_route_if(uint8_t id) {
 
 }
 
+csp_route_t * csp_route_struct(uint8_t id) {
+
+        if (routes[id].interface != NULL) {
+                return &routes[id];
+        } else return NULL;
+
+}
+
+
 int csp_route_enqueue(csp_queue_handle_t handle, void * value, uint32_t timeout, CSP_BASE_TYPE * pxTaskWoken) {
 
 	int result;
@@ -635,6 +644,49 @@ void csp_route_print_table(void) {
 	routes[CSP_DEFAULT_ROUTE].nexthop_mac_addr);
 
 }
+int8_t csp_route_print_remote_table(uint8_t node, uint8_t nodes_requested) {
+        csp_route_info returned_routes[nodes_requested];
+        int status;
+        uint32_t timeout = 2000;//not sure what this should default to
+        uint8_t k,i = 0;
+        uint8_t params[2];
+        printf("Routing table for %u\r\n",node);
+        printf("Node Interface Address\r\n");
+        while(1){//ask for and print 5 nodes at a time
+                params[0] = i;
+                params[1] = nodes_requested;
+                memset(returned_routes,0x00,sizeof(returned_routes));
+                status = csp_transaction(CSP_PRIO_NORM,node,CSP_GET_ROUTE
+                ,timeout,&params[0],sizeof(params),returned_routes
+                ,sizeof(returned_routes));
+                if(status == 0){
+                        printf("Error or incoming length wrong\r\n");
+                        return CSP_ERR_TX;
+                }
+                else if(status < 0){
+                        printf("Error: timeout in csp_transaction\r\n");
+                        return CSP_ERR_TIMEDOUT;
+                }
+                for(k = 0; k < nodes_requested; k++){
+                        if((i+k) > CSP_ROUTE_COUNT)
+                                goto out_of_nodes;
+                        //no route if name_buffer NULL
+                        if(returned_routes[k].name_buffer[0] != 0x00) {
+                                if((i+k) != CSP_DEFAULT_ROUTE){
+                                        printf("%4u %-9s %u\r\n",(i+k)
+                                        ,returned_routes[k].name_buffer
+                                        ,returned_routes[k].nexthop_mac_addr);
+                                }
+                                else printf("  *  %-9s %u\r\n", 
+                                     returned_routes[k].name_buffer, 
+                                     returned_routes[k].nexthop_mac_addr);
+                        }
+                }
+                i += nodes_requested;
+        }
+        out_of_nodes:
+        return CSP_ERR_NONE;
+}
 #endif
 
 #ifdef CSP_USE_PROMISC
@@ -691,4 +743,6 @@ void csp_promisc_add(csp_packet_t * packet, csp_queue_handle_t queue) {
 	}
 
 }
+
+               
 #endif
